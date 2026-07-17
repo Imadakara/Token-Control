@@ -1,0 +1,1 @@
+ALTER TABLE "credit_ledger" ALTER COLUMN "packet_seq" SET DATA TYPE bigint;

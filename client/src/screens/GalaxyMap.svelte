@@ -1,0 +1,95 @@
+<script lang="ts">
+  import { game } from '../lib/game.svelte';
+  import { keyOf } from '../lib/terminal/keys';
+
+  const width = $derived(game.galaxy?.galaxyWidth ?? 10);
+  const height = $derived(game.galaxy?.galaxyHeight ?? 10);
+  const visited = $derived(new Set((game.galaxy?.sectors ?? []).map((s) => s.id)));
+  const current = $derived(game.galaxy?.currentSectorId ?? '');
+
+  let cx = $state(5);
+  let cy = $state(5);
+
+  $effect(() => {
+    // Курсор на текущий сектор при первом открытии
+    const cur = game.galaxy?.currentSectorId;
+    if (cur) {
+      const [gx, gy] = cur.split(':').map(Number);
+      cx = gx!;
+      cy = gy!;
+    }
+  });
+
+  function cellId(gx: number, gy: number) {
+    return `${gx}:${gy}`;
+  }
+
+  function onMapClick(e: MouseEvent) {
+    const cell = (e.target as HTMLElement).dataset;
+    if (cell.c !== undefined && cell.r !== undefined) {
+      cx = Number(cell.c);
+      cy = Number(cell.r);
+    }
+  }
+
+  function confirm() {
+    if (game.pick?.target === 'sector') {
+      void game.enqueue(game.pick.action, { kind: 'sector', sectorId: cellId(cx, cy) });
+      game.screen = 'queue';
+    }
+  }
+
+  function onKey(e: KeyboardEvent) {
+    if (game.screen !== 'galaxy') return;
+    const k = keyOf(e);
+    if (k === 'ArrowLeft') cx = Math.max(0, cx - 1);
+    else if (k === 'ArrowRight') cx = Math.min(width - 1, cx + 1);
+    else if (k === 'ArrowUp') cy = Math.max(0, cy - 1);
+    else if (k === 'ArrowDown') cy = Math.min(height - 1, cy + 1);
+    else if (k === 'Enter') confirm();
+  }
+</script>
+
+<svelte:window onkeydown={onKey} />
+
+<div class="panel">
+  <div class="panel-title">
+    КАРТА ГАЛАКТИКИ — СЕКТОР {current}
+    {#if game.pick}<span class="err">— ВЫБОР ЦЕЛИ ГИПЕРПРЫЖКА</span>{/if}
+  </div>
+  <pre
+    class="map"
+    role="button"
+    tabindex="-1"
+    onclick={onMapClick}
+    ondblclick={confirm}
+    onkeydown={() => {}}>{#each Array.from({ length: height }, (_, gy) => gy) as gy (gy)}{#each Array.from({ length: width }, (_, gx) => gx) as gx (gx)}<span
+          class:cursor={gx === cx && gy === cy}
+          class:cur={cellId(gx, gy) === current}
+          class:vis={visited.has(cellId(gx, gy))}
+          data-c={gx}
+          data-r={gy}>{cellId(gx, gy) === current ? '▣' : visited.has(cellId(gx, gy)) ? '▪' : '·'}</span
+        >{/each}{'\n'}{/each}</pre>
+  <p class="dim">▣ ТЕКУЩИЙ &nbsp; ▪ ПОСЕЩЁН &nbsp; · НЕИЗВЕСТЕН &nbsp; КУРСОР: {cellId(cx, cy)}</p>
+  <p class="dim">ГИПЕРПРЫЖОК В MVP — ТОЛЬКО В СОСЕДНИЕ СЕКТОРА</p>
+</div>
+
+<p class="dim">[←↑↓→] КУРСОР [ENTER] ВЫБОР{game.pick ? ' [ESC] ОТМЕНА' : ''}</p>
+
+<style>
+  .map {
+    line-height: 1.4;
+    letter-spacing: 0.8em;
+    user-select: none;
+  }
+  .map .vis {
+    color: var(--term-fg);
+  }
+  .map .cur {
+    color: var(--term-accent);
+  }
+  .map .cursor {
+    background: var(--term-fg);
+    color: var(--term-bg);
+  }
+</style>

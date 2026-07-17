@@ -1,0 +1,14 @@
+node_modules/
+dist/
+build/
+*.log
+.env
+.env.*
+!.env.example
+
+# Tauri / Rust
+client/src-tauri/target/
+
+# OS
+Thumbs.db
+.DS_Store

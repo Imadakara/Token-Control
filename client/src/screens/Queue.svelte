@@ -1,0 +1,156 @@
+<script lang="ts">
+  import { ACTION_TYPES, type ActionType } from '@tokencontrol/shared';
+  import { api } from '../lib/api';
+  import { ACTION_LABELS, game } from '../lib/game.svelte';
+  import { bar, fmtOvm } from '../lib/terminal/format';
+  import { keyOf } from '../lib/terminal/keys';
+
+  let cursor = $state(0); // выбранный слот (0-based)
+  let adding = $state(false);
+  let addCursor = $state(0);
+  let confirmSlot = $state<1 | 2 | 3 | null>(null);
+
+  const queue = $derived(game.state?.queue ?? []);
+
+  function slotAt(i: number) {
+    return queue.find((q) => q.slot === i + 1) ?? null;
+  }
+
+  async function removeSlot(slot: 1 | 2 | 3) {
+    try {
+      const state = await api.queueRemove(slot);
+      game.state = state;
+      game.say('ЗАДАЧА УДАЛЕНА — ПРОГРЕСС СГОРЕЛ');
+    } catch (err) {
+      game.say(`ОТКАЗ: ${(err as Error).message}`);
+    }
+    confirmSlot = null;
+  }
+
+  async function move(dir: 1 | -1) {
+    const task = slotAt(cursor);
+    if (!task || task.slot === 1) return;
+    const to = task.slot + dir;
+    if (to < 2 || to > 3) return;
+    try {
+      const state = await api.queueReorder(task.slot as 2 | 3, to as 2 | 3);
+      game.state = state;
+      cursor = to - 1;
+    } catch (err) {
+      game.say(`ОТКАЗ: ${(err as Error).message}`);
+    }
+  }
+
+  function onKey(e: KeyboardEvent) {
+    if (game.screen !== 'queue') return;
+    const k = keyOf(e);
+    if (confirmSlot !== null) {
+      if (k === 'Enter' || k.toLowerCase() === 'y') void removeSlot(confirmSlot);
+      else if (k === 'Escape' || k.toLowerCase() === 'n') confirmSlot = null;
+      e.stopPropagation();
+      return;
+    }
+    if (adding) {
+      if (k === 'ArrowUp') addCursor = (addCursor + ACTION_TYPES.length - 1) % ACTION_TYPES.length;
+      else if (k === 'ArrowDown') addCursor = (addCursor + 1) % ACTION_TYPES.length;
+      else if (k === 'Enter') {
+        adding = false;
+        void game.chooseAction(ACTION_TYPES[addCursor] as ActionType);
+      } else if (k === 'Escape') adding = false;
+      e.stopPropagation();
+      return;
+    }
+    if (k === 'ArrowUp') cursor = Math.max(0, cursor - 1);
+    else if (k === 'ArrowDown') cursor = Math.min(2, cursor + 1);
+    else if (k.toLowerCase() === 'a' || k === 'Insert') adding = true;
+    else if (k === 'Delete' || k.toLowerCase() === 'd') {
+      const task = slotAt(cursor);
+      if (task) confirmSlot = task.slot;
+    } else if (k === '+') void move(1);
+    else if (k === '-') void move(-1);
+  }
+</script>
+
+<svelte:window onkeydown={onKey} />
+
+<div class="panel">
+  <div class="panel-title">ОЧЕРЕДЬ ЗАДАЧ БОРТОВОГО КОМПЬЮТЕРА</div>
+  {#each [0, 1, 2] as i (i)}
+    {@const task = slotAt(i)}
+    <div
+      class="slot selectable"
+      class:selected={cursor === i}
+      onclick={() => (cursor = i)}
+      onkeydown={() => {}}
+      role="button"
+      tabindex="-1"
+    >
+      {#if task}
+        <span class="accent">СЛОТ {i + 1}</span>
+        <span>{ACTION_LABELS[task.action]}</span>
+        <span class={task.status === 'active' ? 'accent' : 'dim'}>
+          [{task.status === 'active' ? 'ВЫПОЛНЯЕТСЯ' : 'ОЖИДАНИЕ'}]
+        </span>
+        <pre>{bar(task.progressOvm, task.costOvm, 40)} {fmtOvm(task.progressOvm)}/{fmtOvm(task.costOvm)} ОВМ</pre>
+      {:else}
+        <span class="dim">СЛОТ {i + 1} — ПУСТО</span>
+      {/if}
+    </div>
+  {/each}
+  <p class="dim">
+    БУФЕР ОВМ: <span class="accent">{fmtOvm(game.state?.ovmBuffer ?? 0)}</span> /
+    {fmtOvm(game.config?.ovmBufferCap ?? 100000)}
+  </p>
+</div>
+
+{#if adding}
+  <div class="panel overlay">
+    <div class="panel-title">ВЫБОР ДЕЙСТВИЯ</div>
+    {#each ACTION_TYPES as action, i (action)}
+      <div
+        class="selectable"
+        class:selected={addCursor === i}
+        onclick={() => {
+          adding = false;
+          void game.chooseAction(action);
+        }}
+        onkeydown={() => {}}
+        role="button"
+        tabindex="-1"
+      >
+        {ACTION_LABELS[action]}
+        <span class="dim">({game.config?.actionCosts[action] ?? '?'} ОВМ)</span>
+      </div>
+    {/each}
+    <p class="dim">[↑↓] ВЫБОР [ENTER] OK [ESC] ОТМЕНА</p>
+  </div>
+{/if}
+
+{#if confirmSlot !== null}
+  <div class="panel overlay">
+    <p class="err">УДАЛИТЬ ЗАДАЧУ ИЗ СЛОТА {confirmSlot}? НАКОПЛЕННЫЙ ПРОГРЕСС СГОРИТ.</p>
+    <p>[ENTER/Y] ДА [ESC/N] НЕТ</p>
+  </div>
+{/if}
+
+<p class="dim hint">[A] ДОБАВИТЬ [D/DEL] УДАЛИТЬ [+/-] ПЕРЕСТАВИТЬ (СЛОТЫ 2-3) [↑↓] ВЫБОР</p>
+
+<style>
+  .slot {
+    padding: 0.35rem 0.5rem;
+    margin-bottom: 0.35rem;
+    border: 1px dashed var(--term-dim);
+  }
+  .overlay {
+    position: absolute;
+    top: 30%;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--term-bg);
+    min-width: 24rem;
+    z-index: 10;
+  }
+  .hint {
+    margin-top: 0.5rem;
+  }
+</style>

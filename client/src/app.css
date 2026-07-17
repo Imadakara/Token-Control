@@ -1,0 +1,88 @@
+:root {
+  --term-bg: #0a0f0a;
+  --term-fg: #33ff66;
+  --term-dim: #1a8038;
+  --term-accent: #ffb000;
+  --term-err: #ff4040;
+  --term-sel-bg: #103818;
+  font-family: 'Cascadia Mono', 'Consolas', 'Courier New', monospace;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body,
+#app {
+  height: 100%;
+}
+
+body {
+  background: var(--term-bg);
+  color: var(--term-fg);
+  font-size: 15px;
+  line-height: 1.35;
+  overflow: hidden;
+}
+
+pre {
+  font-family: inherit;
+}
+
+.dim {
+  color: var(--term-dim);
+}
+.accent {
+  color: var(--term-accent);
+}
+.err {
+  color: var(--term-err);
+}
+
+.panel {
+  border: 1px solid var(--term-dim);
+  padding: 0.5rem 0.75rem;
+}
+
+.panel-title {
+  color: var(--term-accent);
+  margin-bottom: 0.35rem;
+}
+
+.selectable {
+  cursor: pointer;
+}
+.selected {
+  background: var(--term-sel-bg);
+  outline: 1px solid var(--term-fg);
+}
+
+.key {
+  color: var(--term-accent);
+}
+
+button {
+  background: none;
+  border: 1px solid var(--term-dim);
+  color: var(--term-fg);
+  font: inherit;
+  padding: 0.1rem 0.5rem;
+  cursor: pointer;
+}
+button:hover {
+  border-color: var(--term-fg);
+}
+
+input {
+  background: var(--term-bg);
+  border: 1px solid var(--term-dim);
+  color: var(--term-fg);
+  font: inherit;
+  padding: 0.15rem 0.4rem;
+}
+input:focus {
+  outline: 1px solid var(--term-fg);
+}
