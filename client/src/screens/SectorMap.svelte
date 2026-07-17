@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { SectorObject } from '@tokencontrol/shared';
   import { game } from '../lib/game.svelte';
+  import { t } from '../lib/i18n.svelte';
   import { keyOf } from '../lib/terminal/keys';
 
   // Символьная карта: координаты сектора [-1000,1000] → сетка COLS×ROWS
@@ -110,8 +111,8 @@
 <div class="wrap">
   <div class="panel">
     <div class="panel-title">
-      КАРТА СЕКТОРА {game.sector?.sectorId ?? '—'}
-      {#if game.pick}<span class="err">— РЕЖИМ ВЫБОРА ЦЕЛИ</span>{/if}
+      {t('КАРТА СЕКТОРА')} {game.sector?.sectorId ?? '—'}
+      {#if game.pick}<span class="err">{t('— РЕЖИМ ВЫБОРА ЦЕЛИ')}</span>{/if}
     </div>
     <!-- Один делегированный обработчик на всю карту: клик = позиция курсора -->
     <pre
@@ -125,13 +126,16 @@
             class:obj={ch !== '·'}
             data-c={ci}
             data-r={ri}>{ch}</span>{/each}{'\n'}{/each}</pre>
-    <p class="dim">@ КОРАБЛЬ &nbsp; S СТАНЦИЯ &nbsp; * АСТЕРОИД &nbsp; c КОНТЕЙНЕР &nbsp; ~ ФЕНОМЕН</p>
+    <p class="dim">
+      {t('@ КОРАБЛЬ')} &nbsp; {t('S СТАНЦИЯ')} &nbsp; {t('* АСТЕРОИД')} &nbsp;
+      {t('c КОНТЕЙНЕР')} &nbsp; {t('~ ФЕНОМЕН')}
+    </p>
   </div>
 
   <div class="panel side">
-    <div class="panel-title">ОБЪЕКТЫ ({objects.length})</div>
+    <div class="panel-title">{t('ОБЪЕКТЫ')} ({objects.length})</div>
     {#if objects.length === 0}
-      <p class="dim">НЕТ ДАННЫХ — ВЫПОЛНИТЕ СКАНИРОВАНИЕ</p>
+      <p class="dim">{t('НЕТ ДАННЫХ — ВЫПОЛНИТЕ СКАНИРОВАНИЕ')}</p>
     {/if}
     {#each objects as o, i (o.id)}
       <div
@@ -150,18 +154,20 @@
         {SYMBOLS[o.type]}
         {o.type.toUpperCase()}
         <span class="dim">[{o.x}; {o.y}]</span>
-        {#if o.props}<span class="accent">✓АНАЛИЗ</span>{/if}
-        {#if o.resourceAmount !== null}<span class="dim">ЗАПАС:{o.resourceAmount}</span>{/if}
+        {#if o.props}<span class="accent">{t('✓АНАЛИЗ')}</span>{/if}
+        {#if o.resourceAmount !== null}<span class="dim">{t('ЗАПАС:')}{o.resourceAmount}</span>{/if}
       </div>
     {/each}
     {#if objectAtCursor?.props}
-      <div class="panel-title" style="margin-top:0.5rem">СВОЙСТВА ЦЕЛИ</div>
+      <div class="panel-title" style="margin-top:0.5rem">{t('СВОЙСТВА ЦЕЛИ')}</div>
       <pre class="dim">{JSON.stringify(objectAtCursor.props, null, 1)}</pre>
     {/if}
   </div>
 </div>
 
-<p class="dim">[←↑↓→] КУРСОР [TAB] ЦЕЛИ [ENTER] ВЫБОР{game.pick ? ' [ESC] ОТМЕНА' : ''}</p>
+<p class="dim">
+  {t('[←↑↓→] КУРСОР [TAB] ЦЕЛИ [ENTER] ВЫБОР')}{game.pick ? ` ${t('[ESC] ОТМЕНА')}` : ''}
+</p>
 
 <style>
   .wrap {

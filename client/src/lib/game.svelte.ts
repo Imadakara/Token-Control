@@ -8,6 +8,7 @@ import type {
 } from '@tokencontrol/shared';
 import { api, connectWs, getToken, hasToken, logout } from './api';
 import { connector } from './connector.svelte';
+import { t } from './i18n.svelte';
 
 export type Screen =
   | 'queue'
@@ -82,13 +83,33 @@ class Game {
     this.disconnectWs?.();
     this.disconnectWs = connectWs((msg) => {
       if (msg.type === 'state_delta') this.applyState(msg.state);
+      else if (msg.type === 'config_changed') this.config = msg.config;
     });
-    if (this.pollTimer) clearInterval(this.pollTimer);
-    this.pollTimer = setInterval(() => void this.refresh().catch(() => {}), 5000);
+    this.startPolling();
+
+    // «Тихий» режим (ТЗ п. 11): окно скрыто/в трее — опрос сервера на паузе,
+    // коннектор в Rust-потоке продолжает считать ОВМ.
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) this.stopPolling();
+      else {
+        void this.refresh().catch(() => {});
+        this.startPolling();
+      }
+    });
 
     // Внутри Tauri-оболочки поднимаем Rust-коннектор Claude Code
     const token = getToken();
     if (token) void connector.start(token);
+  }
+
+  private startPolling(): void {
+    if (this.pollTimer) clearInterval(this.pollTimer);
+    this.pollTimer = setInterval(() => void this.refresh().catch(() => {}), 5000);
+  }
+
+  private stopPolling(): void {
+    if (this.pollTimer) clearInterval(this.pollTimer);
+    this.pollTimer = null;
   }
 
   async refresh(): Promise<void> {
@@ -165,9 +186,9 @@ class Game {
     try {
       const state = await api.queueAdd(action, params);
       this.applyState(state);
-      this.say(`ЗАДАЧА ПОСТАВЛЕНА: ${ACTION_LABELS[action]}`);
+      this.say(`${t('ЗАДАЧА ПОСТАВЛЕНА:')} ${t(ACTION_LABELS[action])}`);
     } catch (err) {
-      this.say(`ОТКАЗ: ${(err as Error).message}`);
+      this.say(`${t('ОТКАЗ:')} ${(err as Error).message}`);
     }
     this.pick = null;
   }

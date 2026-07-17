@@ -72,7 +72,38 @@ pub fn run() {
                         .build(),
                 )?;
             }
+
+            // Трей и «тихий» режим (ТЗ п. 11): терминал живёт в фоне,
+            // коннектор продолжает считать ОВМ при скрытом окне.
+            use tauri::menu::{Menu, MenuItem};
+            use tauri::tray::TrayIconBuilder;
+            let show = MenuItem::with_id(app, "show", "Показать терминал", true, None::<&str>)?;
+            let quit = MenuItem::with_id(app, "quit", "Выход", true, None::<&str>)?;
+            let menu = Menu::with_items(app, &[&show, &quit])?;
+            TrayIconBuilder::with_id("main")
+                .icon(app.default_window_icon().expect("window icon").clone())
+                .tooltip("TOKEN CONTROL")
+                .menu(&menu)
+                .on_menu_event(|app, event| match event.id.as_ref() {
+                    "show" => {
+                        if let Some(window) = app.get_webview_window("main") {
+                            let _ = window.show();
+                            let _ = window.set_focus();
+                        }
+                    }
+                    "quit" => app.exit(0),
+                    _ => {}
+                })
+                .build(app)?;
+
             Ok(())
+        })
+        .on_window_event(|window, event| {
+            // Закрытие окна = сворачивание в трей, а не выход
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                let _ = window.hide();
+                api.prevent_close();
+            }
         })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

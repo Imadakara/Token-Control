@@ -2,6 +2,7 @@
   import { ACTION_TYPES, type ActionType } from '@tokencontrol/shared';
   import { api } from '../lib/api';
   import { ACTION_LABELS, game } from '../lib/game.svelte';
+  import { t } from '../lib/i18n.svelte';
   import { bar, fmtOvm } from '../lib/terminal/format';
   import { keyOf } from '../lib/terminal/keys';
 
@@ -22,7 +23,7 @@
       game.state = state;
       game.say('ЗАДАЧА УДАЛЕНА — ПРОГРЕСС СГОРЕЛ');
     } catch (err) {
-      game.say(`ОТКАЗ: ${(err as Error).message}`);
+      game.say(`${t('ОТКАЗ:')} ${(err as Error).message}`);
     }
     confirmSlot = null;
   }
@@ -37,7 +38,7 @@
       game.state = state;
       cursor = to - 1;
     } catch (err) {
-      game.say(`ОТКАЗ: ${(err as Error).message}`);
+      game.say(`${t('ОТКАЗ:')} ${(err as Error).message}`);
     }
   }
 
@@ -74,7 +75,7 @@
 <svelte:window onkeydown={onKey} />
 
 <div class="panel">
-  <div class="panel-title">ОЧЕРЕДЬ ЗАДАЧ БОРТОВОГО КОМПЬЮТЕРА</div>
+  <div class="panel-title">{t('ОЧЕРЕДЬ ЗАДАЧ БОРТОВОГО КОМПЬЮТЕРА')}</div>
   {#each [0, 1, 2] as i (i)}
     {@const task = slotAt(i)}
     <div
@@ -86,26 +87,26 @@
       tabindex="-1"
     >
       {#if task}
-        <span class="accent">СЛОТ {i + 1}</span>
-        <span>{ACTION_LABELS[task.action]}</span>
+        <span class="accent">{t('СЛОТ')} {i + 1}</span>
+        <span>{t(ACTION_LABELS[task.action])}</span>
         <span class={task.status === 'active' ? 'accent' : 'dim'}>
-          [{task.status === 'active' ? 'ВЫПОЛНЯЕТСЯ' : 'ОЖИДАНИЕ'}]
+          [{task.status === 'active' ? t('ВЫПОЛНЯЕТСЯ') : t('ОЖИДАНИЕ')}]
         </span>
-        <pre>{bar(task.progressOvm, task.costOvm, 40)} {fmtOvm(task.progressOvm)}/{fmtOvm(task.costOvm)} ОВМ</pre>
+        <pre>{bar(task.progressOvm, task.costOvm, 40)} {fmtOvm(task.progressOvm)}/{fmtOvm(task.costOvm)} {t('ОВМ')}</pre>
       {:else}
-        <span class="dim">СЛОТ {i + 1} — ПУСТО</span>
+        <span class="dim">{t('СЛОТ')} {i + 1} {t('— ПУСТО')}</span>
       {/if}
     </div>
   {/each}
   <p class="dim">
-    БУФЕР ОВМ: <span class="accent">{fmtOvm(game.state?.ovmBuffer ?? 0)}</span> /
+    {t('БУФЕР ОВМ:')} <span class="accent">{fmtOvm(game.state?.ovmBuffer ?? 0)}</span> /
     {fmtOvm(game.config?.ovmBufferCap ?? 100000)}
   </p>
 </div>
 
 {#if adding}
   <div class="panel overlay">
-    <div class="panel-title">ВЫБОР ДЕЙСТВИЯ</div>
+    <div class="panel-title">{t('ВЫБОР ДЕЙСТВИЯ')}</div>
     {#each ACTION_TYPES as action, i (action)}
       <div
         class="selectable"
@@ -118,22 +119,22 @@
         role="button"
         tabindex="-1"
       >
-        {ACTION_LABELS[action]}
-        <span class="dim">({game.config?.actionCosts[action] ?? '?'} ОВМ)</span>
+        {t(ACTION_LABELS[action])}
+        <span class="dim">({game.config?.actionCosts[action] ?? '?'} {t('ОВМ')})</span>
       </div>
     {/each}
-    <p class="dim">[↑↓] ВЫБОР [ENTER] OK [ESC] ОТМЕНА</p>
+    <p class="dim">{t('[↑↓] ВЫБОР [ENTER] OK [ESC] ОТМЕНА')}</p>
   </div>
 {/if}
 
 {#if confirmSlot !== null}
   <div class="panel overlay">
-    <p class="err">УДАЛИТЬ ЗАДАЧУ ИЗ СЛОТА {confirmSlot}? НАКОПЛЕННЫЙ ПРОГРЕСС СГОРИТ.</p>
-    <p>[ENTER/Y] ДА [ESC/N] НЕТ</p>
+    <p class="err">{t('УДАЛИТЬ ЗАДАЧУ ИЗ СЛОТА')} {confirmSlot}? {t('НАКОПЛЕННЫЙ ПРОГРЕСС СГОРИТ.')}</p>
+    <p>{t('[ENTER/Y] ДА [ESC/N] НЕТ')}</p>
   </div>
 {/if}
 
-<p class="dim hint">[A] ДОБАВИТЬ [D/DEL] УДАЛИТЬ [+/-] ПЕРЕСТАВИТЬ (СЛОТЫ 2-3) [↑↓] ВЫБОР</p>
+<p class="dim hint">{t('[A] ДОБАВИТЬ [D/DEL] УДАЛИТЬ [+/-] ПЕРЕСТАВИТЬ (СЛОТЫ 2-3) [↑↓] ВЫБОР')}</p>
 
 <style>
   .slot {

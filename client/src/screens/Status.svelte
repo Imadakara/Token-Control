@@ -2,6 +2,7 @@
   import { api } from '../lib/api';
   import { connector } from '../lib/connector.svelte';
   import { game } from '../lib/game.svelte';
+  import { t } from '../lib/i18n.svelte';
   import { fmtOvm } from '../lib/terminal/format';
 
   const ship = $derived(game.state?.ship ?? null);
@@ -11,7 +12,7 @@
       game.state = await api.undock();
       game.say('РАССТЫКОВКА ВЫПОЛНЕНА');
     } catch (err) {
-      game.say(`ОТКАЗ: ${(err as Error).message}`);
+      game.say(`${t('ОТКАЗ:')} ${(err as Error).message}`);
     }
   }
 
@@ -19,44 +20,46 @@
     if (game.screen !== 'status') return;
     if (e.key.toLowerCase() === 'u' && ship?.dockedObjectId) void undock();
   }
+
+  const L = (label: string, width = 22) => label.padEnd(width, '.').replace(/\.$/, '. ');
 </script>
 
 <svelte:window onkeydown={onKey} />
 
 <div class="panel">
-  <div class="panel-title">СТАТУС КОРАБЛЯ</div>
+  <div class="panel-title">{t('СТАТУС КОРАБЛЯ')}</div>
   {#if ship}
     <pre>
-СЕКТОР ............... {ship.sectorId}
-КООРДИНАТЫ ........... [{ship.x}; {ship.y}]
-СТЫКОВКА ............. {ship.dockedObjectId ? 'ПРИСТЫКОВАН [U — РАССТЫКОВКА]' : 'СВОБОДНЫЙ ПОЛЁТ'}
+{L(t('СЕКТОР'))} {ship.sectorId}
+{L(t('КООРДИНАТЫ'))} [{ship.x}; {ship.y}]
+{L(t('СТЫКОВКА'))} {ship.dockedObjectId ? t('ПРИСТЫКОВАН [U — РАССТЫКОВКА]') : t('СВОБОДНЫЙ ПОЛЁТ')}
 </pre>
   {/if}
 </div>
 
 <div class="panel" style="margin-top:0.5rem">
-  <div class="panel-title">НАКОПИТЕЛЬ ОВМ</div>
+  <div class="panel-title">{t('НАКОПИТЕЛЬ ОВМ')}</div>
   <pre>
-ВХОДЯЩИЙ ПОТОК ....... {fmtOvm(game.ratePerMin)} ОВМ/МИН
-БУФЕР ................ {fmtOvm(game.state?.ovmBuffer ?? 0)} / {fmtOvm(game.config?.ovmBufferCap ?? 0)}
+{L(t('ВХОДЯЩИЙ ПОТОК'))} {fmtOvm(game.ratePerMin)} {t('ОВМ/МИН')}
+{L(t('БУФЕР'))} {fmtOvm(game.state?.ovmBuffer ?? 0)} / {fmtOvm(game.config?.ovmBufferCap ?? 0)}
 </pre>
 </div>
 
 <div class="panel" style="margin-top:0.5rem">
-  <div class="panel-title">КОННЕКТОР CLAUDE CODE</div>
+  <div class="panel-title">{t('КОННЕКТОР CLAUDE CODE')}</div>
   {#if connector.status}
     {@const s = connector.status}
     <pre>
-СТАТУС ............... {s.running ? 'РАБОТАЕТ' : 'ОСТАНОВЛЕН'}
-АГЕНТ ................ {s.agentDetected ? `ОБНАРУЖЕН (ФАЙЛОВ: ${s.filesTracked})` : 'ТИШИНА'}
-ЗАПИСЕЙ ЗАСЧИТАНО .... {s.freshRecords}
-ОЖИДАЕТ ОТПРАВКИ ..... {fmtOvm(s.outboxOvm)} ОВМ
-ПОСЛЕДНИЙ ПАКЕТ ...... ПРИНЯТО {fmtOvm(s.lastAccepted)} / УРЕЗАНО {fmtOvm(s.lastClipped)}
-{#if s.lastError}<span class="err">ОШИБКА ............... {s.lastError}</span>{/if}</pre>
+{L(t('СТАТУС'))} {s.running ? t('РАБОТАЕТ') : t('ОСТАНОВЛЕН')}
+{L(t('АГЕНТ'))} {s.agentDetected ? `${t('ОБНАРУЖЕН')} (${s.filesTracked})` : t('ТИШИНА')}
+{L(t('ЗАПИСЕЙ ЗАСЧИТАНО'))} {s.freshRecords}
+{L(t('ОЖИДАЕТ ОТПРАВКИ'))} {fmtOvm(s.outboxOvm)} {t('ОВМ')}
+{L(t('ПОСЛЕДНИЙ ПАКЕТ'))} +{fmtOvm(s.lastAccepted)} / -{fmtOvm(s.lastClipped)}
+{#if s.lastError}<span class="err">{L(t('ОШИБКА'))} {s.lastError}</span>{/if}</pre>
   {:else if connector.isTauri}
-    <pre class="dim">СТАТУС ............... ЗАПУСК...</pre>
+    <pre class="dim">{L(t('СТАТУС'))} {t('ЗАПУСК...')}</pre>
   {:else}
-    <pre class="dim">СТАТУС ............... НЕДОСТУПЕН В БРАУЗЕРНОЙ ВЕРСИИ
-ЗАПУСТИТЕ ДЕСКТОП-ОБОЛОЧКУ: npm run tauri dev</pre>
+    <pre class="dim">{L(t('СТАТУС'))} {t('НЕДОСТУПЕН В БРАУЗЕРНОЙ ВЕРСИИ')}
+{t('ЗАПУСТИТЕ ДЕСКТОП-ОБОЛОЧКУ: npm run tauri dev')}</pre>
   {/if}
 </div>

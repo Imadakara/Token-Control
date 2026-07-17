@@ -1,5 +1,6 @@
 <script lang="ts">
   import { game } from '../lib/game.svelte';
+  import { t } from '../lib/i18n.svelte';
   import { keyOf } from '../lib/terminal/keys';
 
   const width = $derived(game.galaxy?.galaxyWidth ?? 10);
@@ -54,8 +55,8 @@
 
 <div class="panel">
   <div class="panel-title">
-    КАРТА ГАЛАКТИКИ — СЕКТОР {current}
-    {#if game.pick}<span class="err">— ВЫБОР ЦЕЛИ ГИПЕРПРЫЖКА</span>{/if}
+    {t('КАРТА ГАЛАКТИКИ — СЕКТОР')} {current}
+    {#if game.pick}<span class="err">{t('— ВЫБОР ЦЕЛИ ГИПЕРПРЫЖКА')}</span>{/if}
   </div>
   <pre
     class="map"
@@ -70,11 +71,14 @@
           data-c={gx}
           data-r={gy}>{cellId(gx, gy) === current ? '▣' : visited.has(cellId(gx, gy)) ? '▪' : '·'}</span
         >{/each}{'\n'}{/each}</pre>
-  <p class="dim">▣ ТЕКУЩИЙ &nbsp; ▪ ПОСЕЩЁН &nbsp; · НЕИЗВЕСТЕН &nbsp; КУРСОР: {cellId(cx, cy)}</p>
-  <p class="dim">ГИПЕРПРЫЖОК В MVP — ТОЛЬКО В СОСЕДНИЕ СЕКТОРА</p>
+  <p class="dim">
+    {t('▣ ТЕКУЩИЙ')} &nbsp; {t('▪ ПОСЕЩЁН')} &nbsp; {t('· НЕИЗВЕСТЕН')} &nbsp;
+    {t('КУРСОР:')} {cellId(cx, cy)}
+  </p>
+  <p class="dim">{t('ГИПЕРПРЫЖОК В MVP — ТОЛЬКО В СОСЕДНИЕ СЕКТОРА')}</p>
 </div>
 
-<p class="dim">[←↑↓→] КУРСОР [ENTER] ВЫБОР{game.pick ? ' [ESC] ОТМЕНА' : ''}</p>
+<p class="dim">{t('[←↑↓→] КУРСОР [ENTER] ВЫБОР')}{game.pick ? ` ${t('[ESC] ОТМЕНА')}` : ''}</p>
 
 <style>
   .map {

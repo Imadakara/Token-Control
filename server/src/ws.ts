@@ -26,4 +26,13 @@ export class WsRegistry {
       if (socket.readyState === socket.OPEN) socket.send(data);
     }
   }
+
+  broadcast(msg: WsServerMessage): void {
+    const data = JSON.stringify(msg);
+    for (const set of this.sockets.values()) {
+      for (const socket of set) {
+        if (socket.readyState === socket.OPEN) socket.send(data);
+      }
+    }
+  }
 }

@@ -1,5 +1,6 @@
 <script lang="ts">
   import { game } from './lib/game.svelte';
+  import { t } from './lib/i18n.svelte';
 
   let name = $state(localStorage.getItem('tc_player') ?? '');
   let error = $state('');
@@ -25,9 +26,9 @@
 ║        T O K E N   C O N T R O L   ║
 ║        БОРТОВОЙ КОМПЬЮТЕР v0.0.1   ║
 ╚════════════════════════════════════╝</pre>
-  <p class="dim">DEV-РЕЖИМ: STEAM-АВТОРИЗАЦИЯ БУДЕТ ПОДКЛЮЧЕНА ПОЗЖЕ</p>
+  <p class="dim">{t('DEV-РЕЖИМ: STEAM-АВТОРИЗАЦИЯ БУДЕТ ПОДКЛЮЧЕНА ПОЗЖЕ')}</p>
   <p>
-    ПОЗЫВНОЙ КАПИТАНА:
+    {t('ПОЗЫВНОЙ КАПИТАНА:')}
     <!-- svelte-ignore a11y_autofocus -->
     <input
       autofocus
@@ -35,9 +36,9 @@
       maxlength="64"
       onkeydown={(e) => e.key === 'Enter' && submit()}
     />
-    <button onclick={submit} disabled={busy}>ВХОД</button>
+    <button onclick={submit} disabled={busy}>{t('ВХОД')}</button>
   </p>
-  {#if error}<p class="err">ОТКАЗ: {error}</p>{/if}
+  {#if error}<p class="err">{t('ОТКАЗ:')} {error}</p>{/if}
 </main>
 
 <style>

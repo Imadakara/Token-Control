@@ -2,6 +2,7 @@
   import Login from './Login.svelte';
   import Crt from './lib/terminal/Crt.svelte';
   import { game, type Screen } from './lib/game.svelte';
+  import { t } from './lib/i18n.svelte';
   import { bar, fmtOvm } from './lib/terminal/format';
   import { keyOf } from './lib/terminal/keys';
   import Queue from './screens/Queue.svelte';
@@ -49,16 +50,16 @@
     <header>
       <span class="accent">TOKEN CONTROL</span>
       <span class:dim={!game.online} class:err={!game.online}>
-        {game.online ? '● СВЯЗЬ' : '○ НЕТ СВЯЗИ'}
+        {game.online ? t('● СВЯЗЬ') : t('○ НЕТ СВЯЗИ')}
       </span>
-      <span>ПОТОК: <span class="accent">{fmtOvm(game.ratePerMin)}</span> ОВМ/МИН</span>
+      <span>{t('ПОТОК:')} <span class="accent">{fmtOvm(game.ratePerMin)}</span> {t('ОВМ/МИН')}</span>
       {#if activeTask}
         <span>
-          СЛОТ 1: <span class="accent">{bar(activeTask.progressOvm, activeTask.costOvm, 16)}</span>
+          {t('СЛОТ 1:')} <span class="accent">{bar(activeTask.progressOvm, activeTask.costOvm, 16)}</span>
           {Math.floor((activeTask.progressOvm / activeTask.costOvm) * 100)}%
         </span>
       {:else}
-        <span class="dim">ОЧЕРЕДЬ ПУСТА → БУФЕР {fmtOvm(game.state?.ovmBuffer ?? 0)}</span>
+        <span class="dim">{t('ОЧЕРЕДЬ ПУСТА → БУФЕР')} {fmtOvm(game.state?.ovmBuffer ?? 0)}</span>
       {/if}
     </header>
 
@@ -69,7 +70,7 @@
           onclick={() => !game.pick && (game.screen = item.id)}
         >
           <span class="key">{item.key}</span>
-          {item.label}
+          {t(item.label)}
         </button>
       {/each}
     </nav>
@@ -86,7 +87,7 @@
 
     <footer>
       <span class="dim">&gt;</span>
-      {game.message || 'СИСТЕМЫ В НОРМЕ'}
+      {t(game.message) || t('СИСТЕМЫ В НОРМЕ')}
     </footer>
   </div>
 {/if}
