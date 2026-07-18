@@ -43,7 +43,12 @@ fn main() {
 
     while let Ok(status) = status_rx.recv() {
         println!(
-            "[connector] files={} fresh={} outbox={:.3} accepted={:.3} clipped={:.3}{}",
+            "[connector] agent={} files={} fresh={} outbox={:.3} accepted={:.3} clipped={:.3}{}",
+            if status.agent_detected {
+                format!("АКТИВЕН({}s)", status.last_activity_secs.unwrap_or(0))
+            } else {
+                "ТИШИНА".to_string()
+            },
             status.files_tracked,
             status.fresh_records,
             status.outbox_ovm,

@@ -51,7 +51,7 @@
     {@const s = connector.status}
     <pre>
 {L(t('СТАТУС'))} {s.running ? t('РАБОТАЕТ') : t('ОСТАНОВЛЕН')}
-{L(t('АГЕНТ'))} {s.agentDetected ? `${t('ОБНАРУЖЕН')} (${s.filesTracked})` : t('ТИШИНА')}
+{L(t('АГЕНТ'))} {s.agentDetected ? `${t('АКТИВЕН')} (${s.lastActivitySecs ?? 0}${t('С НАЗАД')})` : t('ТИШИНА')}
 {L(t('ЗАПИСЕЙ ЗАСЧИТАНО'))} {s.freshRecords}
 {L(t('ОЖИДАЕТ ОТПРАВКИ'))} {fmtOvm(s.outboxOvm)} {t('ОВМ')}
 {L(t('ПОСЛЕДНИЙ ПАКЕТ'))} +{fmtOvm(s.lastAccepted)} / -{fmtOvm(s.lastClipped)}

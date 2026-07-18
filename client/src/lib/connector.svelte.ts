@@ -5,7 +5,10 @@
 
 export interface ConnectorStatus {
   running: boolean;
+  /** Логи агента росли недавно (окно ~2 мин), а не «файлы существуют». */
   agentDetected: boolean;
+  /** Секунд с последней активности агента; null — активности не было. */
+  lastActivitySecs: number | null;
   filesTracked: number;
   freshRecords: number;
   outboxOvm: number;

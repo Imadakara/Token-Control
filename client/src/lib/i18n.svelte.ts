@@ -130,6 +130,11 @@ const EN: Record<string, string> = {
   'НАСТРОЙКИ — КОННЕКТОР': 'SETTINGS — CONNECTOR',
   'НАСТРОЙКИ — АККАУНТ': 'SETTINGS — ACCOUNT',
   '[L] СМЕНИТЬ КАПИТАНА': '[L] CHANGE CAPTAIN',
+  'НАСТРОЙКИ — ОТЛАДКА': 'SETTINGS — DEBUG',
+  'РЕЖИМ ОТЛАДКИ АКТИВЕН (ПОЗЫВНОЙ DEBUG)': 'DEBUG MODE ACTIVE (CALLSIGN DEBUG)',
+  '[B] +1000 ОВМ В БУФЕР': '[B] +1000 CPP TO BUFFER',
+  'АКТИВЕН': 'ACTIVE',
+  'С НАЗАД': 'S AGO',
 
   // Журнал
   'ЖУРНАЛ ОПЕРАЦИЙ': 'OPERATIONS LOG',

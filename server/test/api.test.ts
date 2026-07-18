@@ -72,6 +72,28 @@ describe('maps', () => {
   });
 });
 
+describe('debug', () => {
+  it('дебаг-начисление доступно только капитану DEBUG', async () => {
+    const forbidden = await app.inject({
+      method: 'POST',
+      url: '/debug/credit',
+      headers: auth(), // обычный игрок tester
+      payload: { ovm: 1000 },
+    });
+    expect(forbidden.statusCode).toBe(403);
+
+    const debugToken = await authToken(app, 'DEBUG');
+    const res = await app.inject({
+      method: 'POST',
+      url: '/debug/credit',
+      headers: { authorization: `Bearer ${debugToken}` },
+      payload: { ovm: 1000 },
+    });
+    expect(res.statusCode).toBe(200);
+    expect((res.json() as StateResponse).ovmBuffer).toBe(1000);
+  });
+});
+
 describe('config', () => {
   it('отдаёт игровой конфиг со стоимостями действий', async () => {
     const res = await app.inject({ method: 'GET', url: '/config' });

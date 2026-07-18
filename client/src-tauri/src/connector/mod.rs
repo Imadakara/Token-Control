@@ -16,15 +16,20 @@ use std::time::{Duration, SystemTime};
 use store::Store;
 use submit::{ConversionConfig, GameClient};
 
-pub const SCAN_INTERVAL: Duration = Duration::from_secs(10);
-pub const SUBMIT_INTERVAL: Duration = Duration::from_secs(30);
+pub const SCAN_INTERVAL: Duration = Duration::from_secs(5);
+pub const SUBMIT_INTERVAL: Duration = Duration::from_secs(15);
+/// Агент считается работающим, если файлы логов росли в этом окне.
+pub const ACTIVITY_WINDOW: Duration = Duration::from_secs(120);
 
 /// Статус коннектора для UI (экран СТАТУС/НАСТРОЙКИ, ТЗ п. 4.2.5/4.2.7).
 #[derive(Debug, Clone, Default, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ConnectorStatus {
     pub running: bool,
+    /// Активность по факту РОСТА файлов логов (не по их наличию!).
     pub agent_detected: bool,
+    /// Сколько секунд назад была последняя активность агента (None — не было).
+    pub last_activity_secs: Option<u64>,
     pub files_tracked: usize,
     pub fresh_records: u64,
     pub outbox_ovm: f64,
@@ -62,6 +67,14 @@ fn now_iso() -> String {
     humantime::format_rfc3339_seconds(SystemTime::now()).to_string()
 }
 
+/// Результат цикла сканирования.
+pub struct ScanOutcome {
+    pub files: usize,
+    pub fresh: u64,
+    /// Хоть один файл вырос — агент что-то писал (активность).
+    pub grew: bool,
+}
+
 /// Один цикл сканирования: дочитать выросшие файлы, задедупить, начислить.
 /// При `credit = false` (baseline при первом запуске) история индексируется
 /// без начисления — засчитываются только токены после установки.
@@ -71,10 +84,11 @@ pub fn scan_cycle(
     conversion: &ConversionConfig,
     credit: bool,
     interval_start: &str,
-) -> Result<(usize, u64), String> {
+) -> Result<ScanOutcome, String> {
     let files = jsonl_files(projects_dir);
     let mut all_records = Vec::new();
     let mut new_offsets = Vec::new();
+    let mut grew = false;
 
     for path in &files {
         let path_str = path.to_string_lossy().to_string();
@@ -83,6 +97,7 @@ pub fn scan_cycle(
         if size == stored {
             continue;
         }
+        grew = true;
         match parser::read_from_offset(path, stored) {
             Ok((records, consumed)) => {
                 all_records.extend(records);
@@ -102,7 +117,7 @@ pub fn scan_cycle(
         )
         .map_err(|e| e.to_string())?;
 
-    Ok((files.len(), fresh as u64))
+    Ok(ScanOutcome { files: files.len(), fresh: fresh as u64, grew })
 }
 
 /// Отправляет накопленный outbox по порядку; останавливается на первой ошибке
@@ -171,6 +186,7 @@ pub fn run_loop(config: ConnectorConfig, status_tx: Sender<ConnectorStatus>, sto
 
     let mut interval_start = now_iso();
     let mut last_submit = std::time::Instant::now();
+    let mut last_activity: Option<std::time::Instant> = None;
 
     loop {
         if stop.try_recv().is_ok() {
@@ -179,20 +195,29 @@ pub fn run_loop(config: ConnectorConfig, status_tx: Sender<ConnectorStatus>, sto
             return;
         }
 
+        let mut flush_now = false;
         match scan_cycle(&mut store, &config.projects_dir, &conversion, true, &interval_start) {
-            Ok((files, fresh)) => {
-                status.files_tracked = files;
-                status.fresh_records += fresh;
-                status.agent_detected = files > 0;
-                if fresh > 0 {
+            Ok(outcome) => {
+                status.files_tracked = outcome.files;
+                status.fresh_records += outcome.fresh;
+                if outcome.grew {
+                    last_activity = Some(std::time::Instant::now());
+                }
+                if outcome.fresh > 0 {
                     interval_start = now_iso();
+                    flush_now = true; // свежие токены — отправляем сразу, без ожидания
                 }
                 status.last_error = None;
             }
             Err(e) => status.last_error = Some(e),
         }
 
-        if last_submit.elapsed() >= SUBMIT_INTERVAL {
+        // «Агент работает» = логи росли недавно, а не «файлы существуют»
+        status.agent_detected =
+            last_activity.is_some_and(|t| t.elapsed() <= ACTIVITY_WINDOW);
+        status.last_activity_secs = last_activity.map(|t| t.elapsed().as_secs());
+
+        if flush_now || last_submit.elapsed() >= SUBMIT_INTERVAL {
             let (accepted, clipped, error) = flush_outbox(&store, &client);
             if accepted > 0.0 || clipped > 0.0 {
                 status.last_accepted = accepted;

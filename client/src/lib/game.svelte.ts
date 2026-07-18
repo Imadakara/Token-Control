@@ -38,6 +38,7 @@ export const ACTION_LABELS: Record<ActionType, string> = {
 class Game {
   authorized = $state(hasToken());
   online = $state(false);
+  playerName = $state(localStorage.getItem('tc_player') ?? '');
   screen = $state<Screen>('queue');
   state = $state<StateResponse | null>(null);
   config = $state<ConfigResponse | null>(null);
@@ -59,9 +60,15 @@ class Game {
   private disconnectWs: (() => void) | null = null;
   private pollTimer: ReturnType<typeof setInterval> | null = null;
 
+  /** Дебаг-режим: вход с позывным DEBUG открывает панель отладки. */
+  get debugMode(): boolean {
+    return this.playerName === 'DEBUG';
+  }
+
   async login(playerId: string): Promise<void> {
     await api.login(playerId);
     this.authorized = true;
+    this.playerName = playerId;
     await this.start();
   }
 

@@ -5,6 +5,7 @@ import { createDb, DATABASE_URL, type Db } from './db/client';
 import { loadServerConfig, type ServerConfig } from './game/config';
 import { authRoutes } from './routes/auth';
 import { creditsRoutes } from './routes/credits';
+import { debugRoutes } from './routes/debug';
 import { logRoutes } from './routes/log';
 import { mapRoutes } from './routes/map';
 import { queueRoutes } from './routes/queue';
@@ -72,6 +73,7 @@ export async function buildApp(opts: BuildAppOptions = {}): Promise<FastifyInsta
   await app.register(queueRoutes);
   await app.register(creditsRoutes);
   await app.register(logRoutes);
+  await app.register(debugRoutes);
 
   return app;
 }
