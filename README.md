@@ -4,39 +4,48 @@
 
 - ТЗ: `Personal Vault/Token Control Docs/ТЗ - MVP - Token Control v0.01.md`
 - План разработки и статус фаз: [docs/PLAN.md](docs/PLAN.md)
+- Документация реализации фаз 1–5: [docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md)
 
-## Быстрый запуск
+## Как запустить
 
-Требуются: **Node.js 20+**, **Rust (msvc)**, **Docker** (PostgreSQL). Один раз:
+Нужны установленные: **Node.js 20+**, **Rust**, **Docker Desktop**.
+
+### Вариант 1 — полное приложение (окно + начисление за Claude Code)
+
+1. Запустите **Docker Desktop** (иконка кита должна быть в трее).
+2. В папке проекта выполните:
+   ```sh
+   npm install        # только при первом запуске
+   npm run desktop
+   ```
+3. Дождитесь окна «TOKEN CONTROL» (первый запуск компилирует Rust — 5–10 минут, дальше секунды), введите любой позывной — вы в игре.
+
+Эта команда сама поднимает PostgreSQL, игровой сервер и открывает окно. Коннектор Claude Code стартует автоматически после входа: работаете с Claude Code — корабль получает ОВМ. Закрытие окна сворачивает игру в трей.
+
+### Вариант 2 — в браузере (без окна, для разработки UI)
+
+1. Запустите **Docker Desktop**.
+2. `npm run dev`
+3. Откройте http://localhost:5173 и войдите.
+
+В браузере коннектора нет — ОВМ подаются вручную, из второго терминала:
 
 ```sh
-npm install                # зависимости всех воркспейсов
-docker compose up -d db    # PostgreSQL на localhost:5544 (данные в volume)
+npx tsx server/scripts/feed.ts misha 25 5          # синтетика: 25 ОВМ каждые 5 секунд
+# или реальные токены Claude Code без окна:
+cd client/src-tauri && cargo run --bin connector_cli -- misha
 ```
 
-Каждый день:
+(`misha` — позывной, под которым вы вошли.)
 
-```sh
-npm run dev                # сервер :8787 + веб-клиент :5173 (миграции применяются сами)
-```
+Не запускайте оба варианта одновременно — они делят порты 5173/8787.
 
-Откройте http://localhost:5173, введите позывной — корабль появится в секторе 5:5.
+### Прочее
 
-Варианты подачи ОВМ:
-
-| Способ | Команда | Когда |
-|---|---|---|
-| Синтетика | `npx tsx server/scripts/feed.ts misha 25 5` | Быстрая проверка геймплея |
-| Реальный Claude Code | `cd client/src-tauri && cargo run --bin connector_cli -- misha` | Коннектор без окна: читает `~/.claude/projects`, историю не зачисляет |
-| Десктоп-оболочка | `npm run tauri dev --workspace client` | Полное приложение: окно + трей + автозапуск коннектора после входа |
-
-Тесты: `npm test` (сервер, нужен Docker) и `cd client/src-tauri && cargo test` (коннектор).
-
-Полезное:
-
-- Сервер читает порт из `GAME_SERVER_PORT` (не `PORT` — его подставляют превью-раннеры), БД — из `DATABASE_URL`.
+- Тесты: `npm test` (сервер, нужен Docker) и `cd client/src-tauri && cargo test` (коннектор).
+- Сервер читает порт из `GAME_SERVER_PORT` (не `PORT`), БД — из `DATABASE_URL`.
 - Игровой баланс (стоимости, формула ОВМ, лимиты, генерация) лежит в таблице `game_config` и перечитывается раз в 60 с — правится без рестарта и без релиза клиента (ТЗ п. 12.2).
-- Сброс мира: `docker compose down -v && docker compose up -d db`.
+- Сброс мира: `docker compose down -v` (потом обычный запуск).
 
 ## Схема файлов
 
