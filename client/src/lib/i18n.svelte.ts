@@ -65,6 +65,13 @@ const EN: Record<string, string> = {
   'ОБЪЕКТЫ': 'OBJECTS',
   'НЕТ ДАННЫХ — ВЫПОЛНИТЕ СКАНИРОВАНИЕ': 'NO DATA — RUN A SCAN',
   'СВОЙСТВА ЦЕЛИ': 'TARGET PROPERTIES',
+  'ИНФОРМАЦИЯ ОБ ОБЪЕКТЕ': 'OBJECT INFO',
+  'ТИП': 'TYPE',
+  'ПРОАНАЛИЗИРОВАН': 'ANALYZED',
+  'ПРОСКАНИРОВАН': 'SCANNED',
+  'ЗАПАС': 'STOCK',
+  'ДАННЫЕ ОГРАНИЧЕНЫ — ТРЕБУЕТСЯ АНАЛИЗ ОБЪЕКТА': 'LIMITED DATA — OBJECT ANALYSIS REQUIRED',
+  'НАВЕДИТЕ КУРСОР НА ОБЪЕКТ В СПИСКЕ ИЛИ НА КАРТЕ': 'HOVER AN OBJECT IN THE LIST OR ON THE MAP',
   'ЗАПАС:': 'STOCK:',
   '✓АНАЛИЗ': '✓ANALYZED',
   '[←↑↓→] КУРСОР [TAB] ЦЕЛИ [ENTER] ВЫБОР': '[←↑↓→] CURSOR [TAB] TARGETS [ENTER] SELECT',
@@ -130,6 +137,7 @@ const EN: Record<string, string> = {
 
   // Сообщения
   'ЗАДАЧА ПОСТАВЛЕНА:': 'TASK QUEUED:',
+  'ЗАДАЧА ВЫПОЛНЕНА:': 'TASK COMPLETED:',
   'ЗАДАЧА УДАЛЕНА — ПРОГРЕСС СГОРЕЛ': 'TASK REMOVED — PROGRESS LOST',
   'ВЫБОР ОТМЕНЁН': 'SELECTION CANCELLED',
   'ВЫБЕРИТЕ ТОЧКУ ИЛИ ОБЪЕКТ [ENTER] — ОТМЕНА [ESC]': 'PICK POINT OR OBJECT [ENTER] — CANCEL [ESC]',

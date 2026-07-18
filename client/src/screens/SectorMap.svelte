@@ -12,6 +12,7 @@
   let cx = $state(Math.floor(COLS / 2));
   let cy = $state(Math.floor(ROWS / 2));
   let objIndex = $state(-1); // выбранный объект (Tab)
+  let hoverId = $state<string | null>(null); // наведение в списке объектов
 
   const objects = $derived(game.sector?.objects ?? []);
   const ship = $derived(game.state?.ship ?? null);
@@ -55,6 +56,9 @@
       return col === cx && row === cy;
     }) ?? null,
   );
+
+  /** Объект для инфо-панели: наведение приоритетнее курсора карты. */
+  const infoObject = $derived(objects.find((o) => o.id === hoverId) ?? objectAtCursor);
 
   function cycleObject(dir: 1 | -1) {
     if (objects.length === 0) return;
@@ -132,36 +136,56 @@
     </p>
   </div>
 
-  <div class="panel side">
-    <div class="panel-title">{t('ОБЪЕКТЫ')} ({objects.length})</div>
-    {#if objects.length === 0}
-      <p class="dim">{t('НЕТ ДАННЫХ — ВЫПОЛНИТЕ СКАНИРОВАНИЕ')}</p>
-    {/if}
-    {#each objects as o, i (o.id)}
-      <div
-        class="selectable"
-        class:selected={objectAtCursor?.id === o.id}
-        onclick={() => {
-          objIndex = i;
-          const [col, row] = toCell(o.x, o.y);
-          cx = col;
-          cy = row;
-        }}
-        onkeydown={() => {}}
-        role="button"
-        tabindex="-1"
-      >
-        {SYMBOLS[o.type]}
-        {o.type.toUpperCase()}
-        <span class="dim">[{o.x}; {o.y}]</span>
-        {#if o.props}<span class="accent">{t('✓АНАЛИЗ')}</span>{/if}
-        {#if o.resourceAmount !== null}<span class="dim">{t('ЗАПАС:')}{o.resourceAmount}</span>{/if}
-      </div>
-    {/each}
-    {#if objectAtCursor?.props}
-      <div class="panel-title" style="margin-top:0.5rem">{t('СВОЙСТВА ЦЕЛИ')}</div>
-      <pre class="dim">{JSON.stringify(objectAtCursor.props, null, 1)}</pre>
-    {/if}
+  <div class="right">
+    <div class="panel side" onmouseleave={() => (hoverId = null)}>
+      <div class="panel-title">{t('ОБЪЕКТЫ')} ({objects.length})</div>
+      {#if objects.length === 0}
+        <p class="dim">{t('НЕТ ДАННЫХ — ВЫПОЛНИТЕ СКАНИРОВАНИЕ')}</p>
+      {/if}
+      {#each objects as o, i (o.id)}
+        <div
+          class="selectable"
+          class:selected={infoObject?.id === o.id}
+          onmouseenter={() => (hoverId = o.id)}
+          onclick={() => {
+            objIndex = i;
+            const [col, row] = toCell(o.x, o.y);
+            cx = col;
+            cy = row;
+          }}
+          onkeydown={() => {}}
+          role="button"
+          tabindex="-1"
+        >
+          {SYMBOLS[o.type]}
+          {o.type.toUpperCase()}
+          <span class="dim">[{o.x}; {o.y}]</span>
+          {#if o.props}<span class="accent">{t('✓АНАЛИЗ')}</span>{/if}
+        </div>
+      {/each}
+    </div>
+
+    <div class="panel info">
+      <div class="panel-title">{t('ИНФОРМАЦИЯ ОБ ОБЪЕКТЕ')}</div>
+      {#if infoObject}
+        <pre>
+{t('ТИП')} ............. {SYMBOLS[infoObject.type]} {infoObject.type.toUpperCase()}
+{t('КООРДИНАТЫ')} ...... [{infoObject.x}; {infoObject.y}]
+{t('СТАТУС')} .......... {infoObject.props ? t('ПРОАНАЛИЗИРОВАН') : t('ПРОСКАНИРОВАН')}</pre>
+        {#if infoObject.props}
+          {#each Object.entries(infoObject.props) as [key, value] (key)}
+            <pre>{key.toUpperCase().padEnd(18, '.')} {String(value).toUpperCase()}</pre>
+          {/each}
+          {#if infoObject.resourceAmount !== null}
+            <pre>{t('ЗАПАС').padEnd(18, '.')} {infoObject.resourceAmount}</pre>
+          {/if}
+        {:else}
+          <p class="dim">{t('ДАННЫЕ ОГРАНИЧЕНЫ — ТРЕБУЕТСЯ АНАЛИЗ ОБЪЕКТА')}</p>
+        {/if}
+      {:else}
+        <p class="dim">{t('НАВЕДИТЕ КУРСОР НА ОБЪЕКТ В СПИСКЕ ИЛИ НА КАРТЕ')}</p>
+      {/if}
+    </div>
   </div>
 </div>
 
@@ -173,7 +197,17 @@
   .wrap {
     display: flex;
     gap: 0.75rem;
-    align-items: flex-start;
+    align-items: stretch; /* правая колонка тянется до низа панели карты */
+  }
+  .right {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    min-width: 24rem;
+  }
+  .info {
+    flex: 1;
+    overflow-y: auto;
   }
   .map {
     line-height: 1.1;
@@ -188,8 +222,7 @@
     color: var(--term-bg);
   }
   .side {
-    min-width: 22rem;
-    max-height: 60vh;
+    max-height: 45vh;
     overflow-y: auto;
   }
 </style>

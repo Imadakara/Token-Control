@@ -2,6 +2,12 @@
 
 По ТЗ: `Personal Vault/Token Control Docs/ТЗ - MVP - Token Control v0.01.md` (v0.01).
 
+> **Статус (2026-07-18):** фазы 0–5 выполнены и проверены, играбельный цикл с
+> реальным коннектором Claude Code работает; фаза 6 (Steam) не начата.
+> Как именно всё реализовано (включая пост-MVP правки движка очереди:
+> кулдаун исполнения, возврат ОВМ невыполнимых задач) — см.
+> [IMPLEMENTATION.md](IMPLEMENTATION.md).
+
 ## Принятые решения
 
 - **Клиент**: Tauri (Rust-бэкенд + веб-UI на Svelte 5 + Vite + TypeScript). Коннектор Claude Code живёт в Rust-части Tauri.

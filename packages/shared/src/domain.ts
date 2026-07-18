@@ -28,6 +28,8 @@ export interface QueueTask {
   costOvm: number;
   progressOvm: number;
   status: QueueTaskStatus;
+  /** Момент активации (ISO); клиент анимирует кулдаун исполнения. */
+  activatedAt: string | null;
 }
 
 export type ActionParams =

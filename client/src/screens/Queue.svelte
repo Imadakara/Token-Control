@@ -10,11 +10,32 @@
   let adding = $state(false);
   let addCursor = $state(0);
   let confirmSlot = $state<1 | 2 | 3 | null>(null);
+  let now = $state(Date.now());
 
   const queue = $derived(game.state?.queue ?? []);
 
   function slotAt(i: number) {
     return queue.find((q) => q.slot === i + 1) ?? null;
+  }
+
+  // Тикер для анимации кулдауна: только пока есть задача в кулдауне
+  const hasCooldownTask = $derived(
+    queue.some((q) => q.status === 'active' && q.progressOvm >= q.costOvm),
+  );
+  $effect(() => {
+    if (!hasCooldownTask) return;
+    const timer = setInterval(() => (now = Date.now()), 100);
+    return () => clearInterval(timer);
+  });
+
+  /** Прогресс для отображения: набравшая стоимость задача «доисполняется»
+   *  визуально в течение кулдауна (бар заполняется за taskCooldownSec). */
+  function displayProgress(task: (typeof queue)[number]): number {
+    if (task.status !== 'active' || task.progressOvm < task.costOvm) return task.progressOvm;
+    const cooldownMs = (game.config?.taskCooldownSec ?? 3) * 1000;
+    if (cooldownMs <= 0 || !task.activatedAt) return task.costOvm;
+    const elapsed = now - new Date(task.activatedAt).getTime();
+    return task.costOvm * Math.max(0, Math.min(1, elapsed / cooldownMs));
   }
 
   async function removeSlot(slot: 1 | 2 | 3) {
@@ -92,7 +113,7 @@
         <span class={task.status === 'active' ? 'accent' : 'dim'}>
           [{task.status === 'active' ? t('ВЫПОЛНЯЕТСЯ') : t('ОЖИДАНИЕ')}]
         </span>
-        <pre>{bar(task.progressOvm, task.costOvm, 40)} {fmtOvm(task.progressOvm)}/{fmtOvm(task.costOvm)} {t('ОВМ')}</pre>
+        <pre>{bar(displayProgress(task), task.costOvm, 40)} {fmtOvm(Math.min(task.progressOvm, task.costOvm))}/{fmtOvm(task.costOvm)} {t('ОВМ')}</pre>
       {:else}
         <span class="dim">{t('СЛОТ')} {i + 1} {t('— ПУСТО')}</span>
       {/if}

@@ -3,7 +3,7 @@ import { and, eq, gte, sql } from 'drizzle-orm';
 import type { Db } from '../db/client';
 import { creditLedger } from '../db/schema';
 import type { ServerConfig } from './config';
-import { applyOvm, lockPlayer } from './queue';
+import { applyOvm, lockPlayer, type QueueEvent } from './queue';
 import { r3 } from './state';
 
 /**
@@ -16,6 +16,7 @@ export async function submitCredits(
   cfg: ServerConfig,
   pid: string,
   req: CreditsSubmitRequest,
+  events?: QueueEvent[],
 ): Promise<CreditsSubmitResponse> {
   return db.transaction(async (tx) => {
     await lockPlayer(tx, pid);
@@ -44,7 +45,7 @@ export async function submitCredits(
     });
 
     if (accepted > 0) {
-      await applyOvm({ db: tx, cfg, pid }, accepted);
+      await applyOvm({ db: tx, cfg, pid, events }, accepted);
     }
 
     return { accepted, clipped: r3(submitted - accepted) };

@@ -36,6 +36,7 @@ export async function buildState(
     costOvm: Number(q.costOvm),
     progressOvm: Number(q.progressOvm),
     status: q.status as QueueTask['status'],
+    activatedAt: q.activatedAt?.toISOString() ?? null,
   }));
 
   const cargoItems: CargoItem[] = cargoRows.map((c) => ({ itemType: c.itemType, qty: c.qty }));

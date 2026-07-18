@@ -15,6 +15,13 @@
       "when": 1784289796902,
       "tag": "0001_packet_seq_bigint",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1784377422688,
+      "tag": "0002_queue_activated_at",
+      "breakpoints": true
     }
   ]
 }

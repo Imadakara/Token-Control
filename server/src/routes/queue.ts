@@ -8,11 +8,31 @@ import type {
 import { ACTION_TYPES } from '@tokencontrol/shared';
 import { eq } from 'drizzle-orm';
 import { ships } from '../db/schema';
-import { addTask, QueueError, removeTask, reorderTasks } from '../game/queue';
+import { addTask, QueueError, removeTask, reorderTasks, type QueueEvent } from '../game/queue';
 import { buildState } from '../game/state';
 
+export function pushQueueEvents(
+  app: FastifyInstance,
+  pid: string,
+  events: QueueEvent[],
+): void {
+  for (const e of events) {
+    app.wsRegistry.push(pid, {
+      type: 'journal',
+      entry: {
+        id: '0',
+        ts: new Date().toISOString(),
+        action: e.action as never,
+        result: e.result,
+        details: null,
+      },
+    });
+  }
+}
+
 export async function queueRoutes(app: FastifyInstance) {
-  const respondWithState = async (pid: string): Promise<StateResponse> => {
+  const respondWithState = async (pid: string, events: QueueEvent[] = []): Promise<StateResponse> => {
+    pushQueueEvents(app, pid, events);
     const state = (await buildState(app.db, app.cfg, pid))!;
     app.wsRegistry.push(pid, { type: 'state_delta', state });
     return state;
@@ -31,14 +51,15 @@ export async function queueRoutes(app: FastifyInstance) {
       if (!ACTION_TYPES.includes(action)) {
         return reply.code(400).send({ error: 'НЕИЗВЕСТНОЕ ДЕЙСТВИЕ' });
       }
+      const events: QueueEvent[] = [];
       try {
         await app.db.transaction(async (tx) => {
-          await addTask({ db: tx, cfg: app.cfg, pid: req.user.pid }, action, params ?? null);
+          await addTask({ db: tx, cfg: app.cfg, pid: req.user.pid, events }, action, params ?? null);
         });
       } catch (err) {
         return handleQueueError(err, reply);
       }
-      return respondWithState(req.user.pid);
+      return respondWithState(req.user.pid, events);
     },
   );
 
@@ -50,14 +71,15 @@ export async function queueRoutes(app: FastifyInstance) {
       if (slot !== 1 && slot !== 2 && slot !== 3) {
         return reply.code(400).send({ error: 'СЛОТ: 1..3' });
       }
+      const events: QueueEvent[] = [];
       try {
         await app.db.transaction(async (tx) => {
-          await removeTask({ db: tx, cfg: app.cfg, pid: req.user.pid }, slot);
+          await removeTask({ db: tx, cfg: app.cfg, pid: req.user.pid, events }, slot);
         });
       } catch (err) {
         return handleQueueError(err, reply);
       }
-      return respondWithState(req.user.pid);
+      return respondWithState(req.user.pid, events);
     },
   );
 

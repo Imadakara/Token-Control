@@ -52,6 +52,9 @@ class Game {
   ratePerMin = $state(0);
   private lastTotal: number | null = null;
   private lastTotalAt = 0;
+  private lastGrowthAt = 0;
+  /** Без притока дольше этого окна показываем 0 (сессия агента завершилась). */
+  private static readonly RATE_SILENCE_MS = 60_000;
 
   private disconnectWs: (() => void) | null = null;
   private pollTimer: ReturnType<typeof setInterval> | null = null;
@@ -84,6 +87,7 @@ class Game {
     this.disconnectWs = connectWs((msg) => {
       if (msg.type === 'state_delta') this.applyState(msg.state);
       else if (msg.type === 'config_changed') this.config = msg.config;
+      else if (msg.type === 'journal') this.onJournalEvent(msg.entry);
     });
     this.startPolling();
 
@@ -133,6 +137,10 @@ class Game {
       const delta = total - this.lastTotal;
       if (delta > 0) {
         this.ratePerMin = Math.round((delta / ((now - this.lastTotalAt) / 60000)) * 10) / 10;
+        this.lastGrowthAt = now;
+      } else if (now - this.lastGrowthAt > Game.RATE_SILENCE_MS) {
+        // Приток давно иссяк (агент не работает) — не показываем стухший поток
+        this.ratePerMin = 0;
       }
     }
     this.lastTotal = total;
@@ -146,6 +154,20 @@ class Game {
   async refreshJournal(): Promise<void> {
     const { entries } = await api.log();
     this.journal = entries;
+  }
+
+  /** Пуш завершения/пропуска задачи: строка терминала + свежий журнал. */
+  private onJournalEvent(entry: LogEntry): void {
+    if (entry.result.startsWith('НЕВЫПОЛНИМО')) {
+      this.say(entry.result);
+    } else if (entry.action in ACTION_LABELS) {
+      this.say(
+        `${t('ЗАДАЧА ВЫПОЛНЕНА:')} ${t(ACTION_LABELS[entry.action as ActionType])}`,
+      );
+    } else {
+      this.say(entry.result);
+    }
+    this.journal = [entry, ...this.journal];
   }
 
   say(text: string): void {

@@ -47,6 +47,8 @@ export const queues = pgTable(
     costOvm: numeric('cost_ovm', { precision: 14, scale: 3 }).notNull(),
     progressOvm: numeric('progress_ovm', { precision: 14, scale: 3 }).notNull().default('0'),
     status: text('status').notNull().default('waiting'),
+    /** Момент активации; исполнение — не раньше activated_at + кулдаун. */
+    activatedAt: timestamp('activated_at', { withTimezone: true }),
   },
   (t) => [primaryKey({ columns: [t.playerId, t.slot] })],
 );

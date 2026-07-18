@@ -3,6 +3,7 @@ import { DATABASE_URL } from './db/client';
 import { runMigrations } from './db/migrate';
 import { loadServerConfig } from './game/config';
 import { startRegenTimer } from './game/regen';
+import { startSweepTimer } from './game/sweep';
 
 // Намеренно не PORT: раннеры превью подставляют PORT для фронтенда.
 const PORT = Number(process.env.GAME_SERVER_PORT ?? 8787);
@@ -11,6 +12,7 @@ await runMigrations(DATABASE_URL);
 
 const app = await buildApp();
 startRegenTimer(app.db);
+startSweepTimer(app);
 
 // Hot-reload конфига (ТЗ п. 12.2): правка game_config в БД применяется
 // без рестарта; клиенты узнают по WS.

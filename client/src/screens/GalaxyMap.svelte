@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { untrack } from 'svelte';
   import { game } from '../lib/game.svelte';
   import { t } from '../lib/i18n.svelte';
   import { keyOf } from '../lib/terminal/keys';
@@ -12,13 +13,18 @@
   let cy = $state(5);
 
   $effect(() => {
-    // Курсор на текущий сектор при первом открытии
-    const cur = game.galaxy?.currentSectorId;
-    if (cur) {
-      const [gx, gy] = cur.split(':').map(Number);
-      cx = gx!;
-      cy = gy!;
-    }
+    // Курсор сбрасывается на текущий сектор ТОЛЬКО при открытии экрана.
+    // Зависимость эффекта — game.screen; чтение galaxy обёрнуто в untrack,
+    // иначе каждый фоновый рефреш карты возвращал курсор на место.
+    if (game.screen !== 'galaxy') return;
+    untrack(() => {
+      const cur = game.galaxy?.currentSectorId;
+      if (cur) {
+        const [gx, gy] = cur.split(':').map(Number);
+        cx = gx!;
+        cy = gy!;
+      }
+    });
   });
 
   function cellId(gx: number, gy: number) {

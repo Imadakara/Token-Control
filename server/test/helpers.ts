@@ -9,8 +9,9 @@ const ADMIN_URL =
 export const TEST_DB = 'tokencontrol_test';
 export const TEST_DATABASE_URL = ADMIN_URL.replace(/\/[^/]+$/, `/${TEST_DB}`);
 
-/** Пересоздаёт чистую тестовую БД и возвращает готовое приложение. */
-export async function createTestApp() {
+/** Пересоздаёт чистую тестовую БД и возвращает готовое приложение.
+ *  Кулдаун исполнения по умолчанию 0 — тесты движка ждать не должны. */
+export async function createTestApp(taskCooldownSec = 0) {
   const admin = postgres(ADMIN_URL, { max: 1 });
   try {
     await admin.unsafe(`DROP DATABASE IF EXISTS ${TEST_DB} WITH (FORCE)`);
@@ -19,6 +20,13 @@ export async function createTestApp() {
     await admin.end();
   }
   await runMigrations(TEST_DATABASE_URL);
+  const seed = postgres(TEST_DATABASE_URL, { max: 1 });
+  try {
+    await seed`INSERT INTO game_config (key, value)
+               VALUES ('game', ${seed.json({ taskCooldownSec })})`;
+  } finally {
+    await seed.end();
+  }
   return buildApp({ databaseUrl: TEST_DATABASE_URL, logger: false });
 }
 

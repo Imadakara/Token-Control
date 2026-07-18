@@ -26,6 +26,8 @@ export interface GameConfig {
   cargoCapacity: number;
   /** Радиус «возле объекта» для стыковки/анализа/добычи/подбора. */
   nearDistance: number;
+  /** Кулдаун исполнения активной задачи после набора стоимости, сек. */
+  taskCooldownSec: number;
 }
 
 export const DEFAULT_GAME_CONFIG: GameConfig = {
@@ -47,4 +49,5 @@ export const DEFAULT_GAME_CONFIG: GameConfig = {
   },
   cargoCapacity: 100,
   nearDistance: 10,
+  taskCooldownSec: 3,
 };

@@ -7,10 +7,20 @@ import { r3, type DbLike } from './state';
 /**
  * Правила очереди (ТЗ п. 5): 3 слота, строго последовательное выполнение,
  * буфер ОВМ с капом, перенос излишка, «НЕВЫПОЛНИМО» с записью в журнал.
+ * Дополнительно: исполнение набравшей стоимость задачи — не раньше, чем через
+ * кулдаун (game.taskCooldownSec) после активации; довершает задачи серверный
+ * свип (game/sweep.ts). Невыполнимая задача НЕ расходует ОВМ — накопленный
+ * прогресс возвращается в каскад.
  * Все функции вызываются внутри транзакции с блокировкой строки игрока.
  */
 
 export class QueueError extends Error {}
+
+/** Событие завершения/пропуска — маршруты пушат его в WS после коммита. */
+export interface QueueEvent {
+  action: string;
+  result: string;
+}
 
 type QueueRow = typeof queues.$inferSelect;
 
@@ -19,13 +29,13 @@ async function getQueue(db: DbLike, pid: string): Promise<QueueRow[]> {
 }
 
 export async function logAction(
-  db: DbLike,
-  pid: string,
+  ctx: ActionCtx,
   action: string,
   result: string,
   details: Record<string, unknown> | null = null,
 ): Promise<void> {
-  await db.insert(actionLog).values({ playerId: pid, action, result, details });
+  await ctx.db.insert(actionLog).values({ playerId: ctx.pid, action, result, details });
+  ctx.events?.push({ action, result });
 }
 
 /** Блокирует строку игрока на время транзакции (сериализация начислений). */
@@ -46,24 +56,16 @@ async function setBuffer(db: DbLike, pid: string, value: number): Promise<void> 
     .where(eq(players.id, pid));
 }
 
-async function completeHead(ctx: ActionCtx, head: QueueRow): Promise<void> {
-  const { db, pid } = ctx;
-  const action = head.actionType as ActionType;
-  const params = head.params as ActionParams | null;
-  // Повторная проверка условия непосредственно перед исполнением
-  const v = await validateAction(ctx, action, params, 'activate');
-  if (v.ok) {
-    const result = await executeAction(ctx, action, params);
-    await logAction(db, pid, action, result, { params });
-  } else {
-    await logAction(db, pid, action, `НЕВЫПОЛНИМО: ${v.reason}`, { params });
-  }
-  await db.delete(queues).where(and(eq(queues.playerId, pid), eq(queues.slot, head.slot)));
+function cooldownElapsed(ctx: ActionCtx, head: QueueRow): boolean {
+  if (!head.activatedAt) return true;
+  const cooldownMs = ctx.cfg.game.taskCooldownSec * 1000;
+  return Date.now() - head.activatedAt.getTime() >= cooldownMs;
 }
 
 /**
  * Сдвигает задачи вверх без дыр и активирует слот 1 с валидацией.
- * Невыполнимые задачи пропускаются с записью в журнал (ТЗ п. 5).
+ * Невыполнимые задачи пропускаются с записью в журнал; их прогресс (если был)
+ * НЕ сгорает — его возвращает вызывающий каскад applyOvm.
  */
 export async function promoteQueue(ctx: ActionCtx): Promise<void> {
   const { db, pid } = ctx;
@@ -93,59 +95,80 @@ export async function promoteQueue(ctx: ActionCtx): Promise<void> {
     if (v.ok) {
       await db
         .update(queues)
-        .set({ status: 'active' })
+        .set({ status: 'active', activatedAt: new Date() })
         .where(and(eq(queues.playerId, pid), eq(queues.slot, 1)));
       return;
     }
-    // НЕВЫПОЛНИМО: прогресс сгорает, задача пропускается
-    await logAction(db, pid, head.actionType, `НЕВЫПОЛНИМО: ${v.reason}`, {
-      params: head.params,
-    });
+    // НЕВЫПОЛНИМО: пропуск; прогресс вернёт applyOvm (ТЗ-фикс: ОВМ не тратятся)
+    await logAction(ctx, head.actionType, `НЕВЫПОЛНИМО: ${v.reason}`, { params: head.params });
+    const refund = Number(head.progressOvm);
     await db.delete(queues).where(and(eq(queues.playerId, pid), eq(queues.slot, 1)));
+    if (refund > 0) {
+      // Возврат в буфер напрямую (вызов вне applyOvm — например, постановка)
+      const buffer = await lockPlayer(db, pid);
+      await setBuffer(db, pid, Math.min(ctx.cfg.game.ovmBufferCap, buffer + refund));
+    }
   }
 }
 
 /**
- * Вливает ОВМ в активную задачу. Заполненные задачи исполняются, излишек
- * каскадом идёт в следующую (ТЗ п. 5), при пустой очереди — в буфер с капом.
+ * Каскад начисления ОВМ. Алгоритм по шагам:
+ * 1) голова невалидна → пропуск, её прогресс возвращается в каскад;
+ * 2) голова набрала стоимость и кулдаун прошёл → исполнение, излишек дальше;
+ * 3) голова набрала стоимость, кулдаун идёт → ждём свип (rest копится в ней);
+ * 4) иначе — вливаем весь rest в счётчик головы (может превысить стоимость —
+ *    излишек уйдёт дальше при исполнении).
+ * Остаток при пустой очереди — в буфер с капом (переполнение игнорируется).
  */
 export async function applyOvm(ctx: ActionCtx, ovm: number): Promise<void> {
   const { db, cfg, pid } = ctx;
   let rest = r3(ovm);
 
-  await promoteQueue(ctx);
-
   for (;;) {
     const rows = await getQueue(db, pid);
     const head = rows[0];
-    if (!head || head.status !== 'active') break;
+    if (!head) break;
 
-    const need = r3(Number(head.costOvm) - Number(head.progressOvm));
-
-    if (need <= 0) {
-      // Счётчик уже полон (заполнен буфером при постановке)
-      await completeHead(ctx, head);
+    if (head.status !== 'active') {
       await promoteQueue(ctx);
+      const fresh = await getQueue(db, pid);
+      if (!fresh[0] || fresh[0].status !== 'active') break;
       continue;
     }
-    if (rest <= 0) break;
 
-    if (rest < need) {
-      await db
-        .update(queues)
-        .set({ progressOvm: String(r3(Number(head.progressOvm) + rest)) })
-        .where(and(eq(queues.playerId, pid), eq(queues.slot, 1)));
-      rest = 0;
-      break;
+    const action = head.actionType as ActionType;
+    const params = head.params as ActionParams | null;
+
+    // Условие могло сломаться после активации — проверяем до траты ОВМ
+    const v = await validateAction(ctx, action, params, 'activate');
+    if (!v.ok) {
+      await logAction(ctx, action, `НЕВЫПОЛНИМО: ${v.reason}`, { params });
+      rest = r3(rest + Number(head.progressOvm)); // ОВМ не расходуются
+      await db.delete(queues).where(and(eq(queues.playerId, pid), eq(queues.slot, 1)));
+      continue;
     }
 
-    rest = r3(rest - need);
-    await completeHead(ctx, head);
-    await promoteQueue(ctx);
+    const progress = Number(head.progressOvm);
+    const cost = Number(head.costOvm);
+
+    if (progress >= cost) {
+      if (!cooldownElapsed(ctx, head)) break; // исполнит свип после кулдауна
+      const result = await executeAction(ctx, action, params);
+      await logAction(ctx, action, result, { params });
+      rest = r3(rest + (progress - cost)); // излишек — дальше по каскаду
+      await db.delete(queues).where(and(eq(queues.playerId, pid), eq(queues.slot, 1)));
+      continue;
+    }
+
+    if (rest <= 0) break;
+    await db
+      .update(queues)
+      .set({ progressOvm: String(r3(progress + rest)) })
+      .where(and(eq(queues.playerId, pid), eq(queues.slot, 1)));
+    rest = 0;
   }
 
   if (rest > 0) {
-    // Очередь пуста — излишек в буфер с капом; переполнение игнорируется (ТЗ п. 5)
     const buffer = await lockPlayer(db, pid);
     await setBuffer(db, pid, Math.min(cfg.game.ovmBufferCap, buffer + rest));
   }
@@ -180,7 +203,7 @@ export async function addTask(
   });
   if (prefill > 0) await setBuffer(db, pid, buffer - prefill);
 
-  // Активация; если буфер целиком закрыл стоимость — исполнится сразу
+  // Активация; заполненная задача исполнится свипом после кулдауна
   await applyOvm(ctx, 0);
 }
 
@@ -190,9 +213,9 @@ export async function removeTask(ctx: ActionCtx, slot: 1 | 2 | 3): Promise<void>
   const rows = await getQueue(db, pid);
   const task = rows.find((t) => t.slot === slot);
   if (!task) throw new QueueError('СЛОТ ПУСТ');
-  // Накопленный прогресс сгорает (ТЗ п. 5); подтверждение — на клиенте
+  // Удаление игроком: накопленный прогресс сгорает (ТЗ п. 5)
   await db.delete(queues).where(and(eq(queues.playerId, pid), eq(queues.slot, slot)));
-  await logAction(db, pid, task.actionType, 'ЗАДАЧА УДАЛЕНА (ПРОГРЕСС СГОРЕЛ)', {
+  await logAction(ctx, task.actionType, 'ЗАДАЧА УДАЛЕНА (ПРОГРЕСС СГОРЕЛ)', {
     progress: Number(task.progressOvm),
   });
   await applyOvm(ctx, 0);

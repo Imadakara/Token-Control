@@ -16,6 +16,8 @@ export interface ActionCtx {
   db: DbLike;
   cfg: ServerConfig;
   pid: string;
+  /** Сток событий завершения/пропуска; маршруты пушат их в WS после коммита. */
+  events?: { action: string; result: string }[];
 }
 
 export type Validation = { ok: true } | { ok: false; reason: string };

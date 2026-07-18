@@ -212,6 +212,91 @@ describe('очередь и начисления', () => {
     expect(state.ovmBuffer).toBe(100_000);
   });
 
+  it('очередь из 3 задач сдвигается по мере выполнения', async () => {
+    const t = api(await authToken(app, 'q10'));
+    await t.add('scan'); // 10, станет активной
+    await t.add('jump_local', { kind: 'point', x: 100, y: 100 }); // 100
+    await t.add('jump_local', { kind: 'point', x: 200, y: 200 }); // 100
+    let state = await t.state();
+    expect(state.queue.map((q) => q.slot)).toEqual([1, 2, 3]);
+
+    await t.submit(60); // скан завершён (10), излишек 50 → в прыжок №1
+    state = await t.state();
+    expect(state.queue).toHaveLength(2);
+    expect(state.queue[0]).toMatchObject({ slot: 1, action: 'jump_local', status: 'active' });
+    expect(state.queue[0]!.progressOvm).toBe(50);
+    expect((state.queue[0]!.params as { x: number }).x).toBe(100);
+    expect(state.queue[1]).toMatchObject({ slot: 2, status: 'waiting' });
+
+    await t.submit(150); // прыжок №1 завершён, 100 → прыжок №2 завершён... 50 остаток? нет: 50+150=200 → оба
+    state = await t.state();
+    expect(state.queue).toHaveLength(0);
+    expect(state.ship.x).toBe(200);
+    expect(state.ovmBuffer).toBe(0);
+  });
+
+  it('невыполнимая задача не расходует ОВМ: накопленный прогресс возвращается', async () => {
+    const t = api(await authToken(app, 'q11'));
+    await t.add('scan');
+    await t.submit(10);
+    const map = await t.sectorMap();
+    const asteroid = map.objects.find((o) => o.type === 'asteroid')!;
+    await t.add('jump_local', { kind: 'object', objectId: asteroid.id });
+    await t.submit(100);
+
+    await t.add('mine', { kind: 'object', objectId: asteroid.id }); // активна, валидна
+    await t.submit(50); // частично накоплено
+    let state = await t.state();
+    expect(state.queue[0]!.progressOvm).toBe(50);
+
+    // Ресурс исчез (например, добыт другим игроком)
+    const { objects } = await import('../src/db/schema');
+    const { eq } = await import('drizzle-orm');
+    await app.db.update(objects).set({ resourceAmount: 0 }).where(eq(objects.id, asteroid.id));
+
+    await t.submit(100); // добыча стала невыполнима → 50 старых + 100 новых → буфер
+    state = await t.state();
+    expect(state.queue).toHaveLength(0);
+    expect(state.ovmBuffer).toBe(150);
+    expect(state.cargo).toEqual([]); // ничего не добыто
+    const log = await t.log();
+    expect(log.entries[0]!.result).toContain('НЕВЫПОЛНИМО');
+  });
+
+  it('кулдаун: заполненная задача исполняется свипом, а не мгновенно', async () => {
+    const pid = 'dev:q12';
+    const t = api(await authToken(app, 'q12'));
+    await t.submit(200); // в буфер
+
+    // Постановка с кулдауном 5с: буфер закрывает стоимость, но исполнения нет
+    const slowCfg = {
+      ...app.cfg,
+      game: { ...app.cfg.game, taskCooldownSec: 5 },
+    };
+    const { addTask, lockPlayer } = await import('../src/game/queue');
+    await app.db.transaction(async (tx) => {
+      await addTask({ db: tx, cfg: slowCfg, pid }, 'scan', null);
+    });
+    let state = await t.state();
+    expect(state.queue).toHaveLength(1);
+    expect(state.queue[0]).toMatchObject({ status: 'active', progressOvm: 10, costOvm: 10 });
+    expect(state.queue[0]!.activatedAt).not.toBeNull();
+
+    // Кулдаун «прошёл» (сдвигаем активацию в прошлое) → свип довершает
+    const { queues } = await import('../src/db/schema');
+    const { eq } = await import('drizzle-orm');
+    await app.db
+      .update(queues)
+      .set({ activatedAt: new Date(Date.now() - 10_000) })
+      .where(eq(queues.playerId, pid));
+    const { sweepQueueCompletions } = await import('../src/game/sweep');
+    await sweepQueueCompletions(app);
+
+    state = await t.state();
+    expect(state.queue).toHaveLength(0);
+    expect((await t.sectorMap()).objects.length).toBeGreaterThan(0); // скан исполнился
+  });
+
   it('гиперпрыжок только в соседний сектор', async () => {
     const t = api(await authToken(app, 'q9'));
     // Дальний сектор проходит постановку (статическая проверка), но при
