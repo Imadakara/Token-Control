@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { and, eq, lte, sql } from 'drizzle-orm';
 import { queues } from '../db/schema';
+import { pushQueueEvents } from '../routes/queue';
 import type { QueueEvent } from './queue';
 import { applyOvm, lockPlayer } from './queue';
 import { buildState } from './state';
@@ -36,18 +37,7 @@ export async function sweepQueueCompletions(app: FastifyInstance): Promise<void>
       continue;
     }
     if (events.length > 0) {
-      for (const e of events) {
-        app.wsRegistry.push(playerId, {
-          type: 'journal',
-          entry: {
-            id: '0',
-            ts: new Date().toISOString(),
-            action: e.action as never,
-            result: e.result,
-            details: null,
-          },
-        });
-      }
+      pushQueueEvents(app, playerId, events);
       const state = await buildState(app.db, app.cfg, playerId);
       if (state) app.wsRegistry.push(playerId, { type: 'state_delta', state });
     }

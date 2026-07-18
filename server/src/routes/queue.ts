@@ -5,6 +5,7 @@ import type {
   QueueReorderRequest,
   StateResponse,
 } from '@tokencontrol/shared';
+import { randomUUID } from 'node:crypto';
 import { ACTION_TYPES } from '@tokencontrol/shared';
 import { eq } from 'drizzle-orm';
 import { ships } from '../db/schema';
@@ -20,7 +21,8 @@ export function pushQueueEvents(
     app.wsRegistry.push(pid, {
       type: 'journal',
       entry: {
-        id: '0',
+        // Уникальный id обязателен: клиент рендерит журнал keyed-списком
+        id: `ws-${randomUUID()}`,
         ts: new Date().toISOString(),
         action: e.action as never,
         result: e.result,
