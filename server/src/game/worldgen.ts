@@ -13,8 +13,10 @@ export interface WorldGenParams {
 
 export const DEFAULT_WORLD: WorldGenParams = {
   galaxySeed: 'token-control-mvp-1',
-  galaxyWidth: 10,
-  galaxyHeight: 10,
+  // Расширено под личные домашние сектора (ТЗ v0.02 п. 4): коллизии редки, а
+  // безвредны — объекты сектора и так глобальны и разделяемы между игроками.
+  galaxyWidth: 32,
+  galaxyHeight: 32,
   startSector: '5:5',
   sectorSize: 1000,
   respawnMinutes: 30,
@@ -48,6 +50,16 @@ export function sectorsAdjacent(a: string, b: string): boolean {
   const cb = parseSectorId(b);
   if (!ca || !cb) return false;
   return Math.abs(ca.gx - cb.gx) + Math.abs(ca.gy - cb.gy) === 1;
+}
+
+/**
+ * Домашний сектор игрока (ТЗ v0.02 п. 4): в распоряжении игрока только один
+ * сектор с псевдослучайной генерацией окружения. Детерминирован по позывному,
+ * поэтому повторный вход не переселяет игрока.
+ */
+export function pickHomeSector(playerId: string, world: WorldGenParams): string {
+  const rng = createRng(`${world.galaxySeed}/home/${playerId}`);
+  return `${rng.int(0, world.galaxyWidth - 1)}:${rng.int(0, world.galaxyHeight - 1)}`;
 }
 
 /**

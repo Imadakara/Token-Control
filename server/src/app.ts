@@ -8,7 +8,7 @@ import { creditsRoutes } from './routes/credits';
 import { debugRoutes } from './routes/debug';
 import { logRoutes } from './routes/log';
 import { mapRoutes } from './routes/map';
-import { queueRoutes } from './routes/queue';
+import { orderRoutes } from './routes/orders';
 import { stateRoutes } from './routes/state';
 import { WsRegistry } from './ws';
 
@@ -70,7 +70,7 @@ export async function buildApp(opts: BuildAppOptions = {}): Promise<FastifyInsta
   await app.register(authRoutes);
   await app.register(stateRoutes);
   await app.register(mapRoutes);
-  await app.register(queueRoutes);
+  await app.register(orderRoutes);
   await app.register(creditsRoutes);
   await app.register(logRoutes);
   await app.register(debugRoutes);

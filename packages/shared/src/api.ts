@@ -1,11 +1,4 @@
-import type {
-  ActionParams,
-  ActionType,
-  CargoItem,
-  QueueTask,
-  SectorObject,
-  ShipState,
-} from './domain';
+import type { ActionParams, ActionType, EntityState, OrderOption, SectorObject } from './domain';
 import type { GameConfig } from './config';
 
 // ---- Auth ----
@@ -20,25 +13,53 @@ export interface AuthResponse {
 // ---- State ----
 
 export interface StateResponse {
-  ship: ShipState;
-  queue: QueueTask[];
+  /** Флот игрока: корабли и стационарные объекты, по приоритету раздачи ОВМ. */
+  entities: EntityState[];
+  /** Общий на игрока буфер ОВМ (ТЗ v0.02 п. 3: бар индивидуальный, буфер общий). */
   ovmBuffer: number;
-  cargo: CargoItem[];
-  cargoCapacity: number;
 }
 
-// ---- Queue ----
+// ---- Orders (ТЗ v0.02 п. 3) ----
 
-export interface QueueAddRequest {
+/** Список доступных приказов по флоту или по одной сущности (?entityId=). */
+export interface OrdersAvailableResponse {
+  entities: { entityId: string; orders: OrderOption[] }[];
+}
+
+/** Постановка приказа. Несколько entityIds — групповой приказ (ТЗ v0.02 п. 2.1). */
+export interface OrdersAddRequest {
+  entityIds: string[];
   action: ActionType;
   params: ActionParams | null;
 }
-export interface QueueRemoveRequest {
-  slot: 1 | 2 | 3;
+/** Веерная рассылка: каждая сущность валидируется независимо. */
+export interface OrdersAddResponse {
+  results: { entityId: string; ok: boolean; reason?: string }[];
+  state: StateResponse;
 }
-export interface QueueReorderRequest {
-  from: 2 | 3;
-  to: 2 | 3;
+export interface OrdersRemoveRequest {
+  entityId: string;
+  slot: number;
+}
+export interface OrdersReorderRequest {
+  entityId: string;
+  from: number;
+  to: number;
+}
+
+// ---- Fleet ----
+
+/** Новый порядок раздачи ОВМ: полный список id сущностей игрока. */
+export interface FleetPriorityRequest {
+  entityIds: string[];
+}
+export interface FleetRenameRequest {
+  entityId: string;
+  name: string;
+}
+/** Расстыковка — мгновенна и бесплатна (ТЗ п. 6.4), не приказ очереди. */
+export interface ShipUndockRequest {
+  entityId: string;
 }
 
 // ---- Credits (коннектор → сервер, ТЗ п. 7.4) ----
@@ -94,7 +115,14 @@ export type ConfigResponse = GameConfig;
 // ---- WebSocket push (сервер → клиент) ----
 
 export type WsServerMessage =
-  | { type: 'progress'; slot: 1 | 2 | 3; progressOvm: number; costOvm: number; ratePerMin: number }
+  | {
+      type: 'progress';
+      entityId: string;
+      slot: number;
+      progressOvm: number;
+      costOvm: number;
+      ratePerMin: number;
+    }
   | { type: 'state_delta'; state: StateResponse }
   | { type: 'journal'; entry: LogEntry }
   | { type: 'config_changed'; config: GameConfig };

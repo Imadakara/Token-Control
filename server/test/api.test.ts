@@ -2,9 +2,13 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
 import type { GalaxyMapResponse, SectorMapResponse, StateResponse } from '@tokencontrol/shared';
 import { authToken, createTestApp } from './helpers';
+import { DEFAULT_WORLD, pickHomeSector } from '../src/game/worldgen';
 
 let app: FastifyInstance;
 let token: string;
+
+/** Каждый игрок стартует в своём домашнем секторе (ТЗ v0.02 п. 4). */
+const HOME = pickHomeSector('dev:tester', DEFAULT_WORLD);
 
 beforeAll(async () => {
   app = await createTestApp();
@@ -39,16 +43,22 @@ describe('auth', () => {
 });
 
 describe('state', () => {
-  it('новый игрок: корабль в стартовом секторе, пустые очередь/трюм/буфер', async () => {
+  it('новый игрок: одна сущность в домашнем секторе, пустые приказы/трюм/буфер', async () => {
     const res = await app.inject({ method: 'GET', url: '/state', headers: auth() });
     expect(res.statusCode).toBe(200);
     const state = res.json() as StateResponse;
-    expect(state.ship.sectorId).toBe('5:5');
-    expect(state.ship.dockedObjectId).toBeNull();
-    expect(state.queue).toEqual([]);
-    expect(state.cargo).toEqual([]);
+    expect(state.entities).toHaveLength(1);
+    const [e] = state.entities;
+    expect(e!.sectorId).toBe(HOME);
+    expect(e!.classId).toBe('scout_mk1');
+    expect(e!.name).toBe('БОРТ-001');
+    expect(e!.status).toBe('idle');
+    expect(e!.orders).toEqual([]);
+    expect(e!.cargoUsed).toBe(0);
+    expect(e!.hp).toBe(e!.hpMax);
+    expect(e!.cargo).toEqual([]);
+    expect(e!.cargoCapacity).toBeGreaterThan(0);
     expect(state.ovmBuffer).toBe(0);
-    expect(state.cargoCapacity).toBeGreaterThan(0);
   });
 });
 
@@ -57,18 +67,20 @@ describe('maps', () => {
     const res = await app.inject({ method: 'GET', url: '/map/sector', headers: auth() });
     expect(res.statusCode).toBe(200);
     const map = res.json() as SectorMapResponse;
-    expect(map.sectorId).toBe('5:5');
+    expect(map.sectorId).toBe(HOME);
     expect(map.objects).toEqual([]);
   });
 
-  it('галактика: стартовый сектор посещён, размеры сетки на месте', async () => {
+  it('галактика: домашний сектор посещён, размеры сетки на месте', async () => {
     const res = await app.inject({ method: 'GET', url: '/map/galaxy', headers: auth() });
     expect(res.statusCode).toBe(200);
     const map = res.json() as GalaxyMapResponse;
-    expect(map.currentSectorId).toBe('5:5');
-    expect(map.galaxyWidth).toBe(10);
-    expect(map.galaxyHeight).toBe(10);
-    expect(map.sectors).toEqual([{ id: '5:5', gx: 5, gy: 5, visited: true }]);
+    expect(map.currentSectorId).toBe(HOME);
+    expect(map.galaxyWidth).toBe(DEFAULT_WORLD.galaxyWidth);
+    expect(map.galaxyHeight).toBe(DEFAULT_WORLD.galaxyHeight);
+    expect(map.sectors).toEqual([
+      { id: HOME, gx: Number(HOME.split(':')[0]), gy: Number(HOME.split(':')[1]), visited: true },
+    ]);
   });
 });
 

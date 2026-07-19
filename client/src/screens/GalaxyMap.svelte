@@ -42,12 +42,12 @@
   function confirm() {
     if (game.pick?.target === 'sector') {
       void game.enqueue(game.pick.action, { kind: 'sector', sectorId: cellId(cx, cy) });
-      game.screen = 'queue';
+      game.screen = 'orders';
     }
   }
 
   function onKey(e: KeyboardEvent) {
-    if (game.screen !== 'galaxy') return;
+    if (game.screen !== 'galaxy' || game.keysCaptured) return;
     const k = keyOf(e);
     if (k === 'ArrowLeft') cx = Math.max(0, cx - 1);
     else if (k === 'ArrowRight') cx = Math.min(width - 1, cx + 1);

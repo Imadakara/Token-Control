@@ -5,11 +5,13 @@
   import { t } from '../lib/i18n.svelte';
   import { fmtOvm } from '../lib/terminal/format';
 
-  const ship = $derived(game.state?.ship ?? null);
+  /** Выбранная во «Флотилии» сущность, иначе — ведущая. */
+  const ship = $derived(game.selectedEntity);
 
   async function undock() {
+    if (!ship) return;
     try {
-      game.state = await api.undock();
+      game.state = await api.undock(ship.id);
       game.say('РАССТЫКОВКА ВЫПОЛНЕНА');
     } catch (err) {
       game.say(`${t('ОТКАЗ:')} ${(err as Error).message}`);
@@ -17,7 +19,7 @@
   }
 
   function onKey(e: KeyboardEvent) {
-    if (game.screen !== 'status') return;
+    if (game.screen !== 'status' || game.keysCaptured) return;
     if (e.key.toLowerCase() === 'u' && ship?.dockedObjectId) void undock();
   }
 
@@ -27,11 +29,13 @@
 <svelte:window onkeydown={onKey} />
 
 <div class="panel">
-  <div class="panel-title">{t('СТАТУС КОРАБЛЯ')}</div>
+  <div class="panel-title">{t('СТАТУС СУЩНОСТИ')}</div>
   {#if ship}
     <pre>
+{L(t('НАЗВАНИЕ'))} {ship.name}
 {L(t('СЕКТОР'))} {ship.sectorId}
-{L(t('КООРДИНАТЫ'))} [{ship.x}; {ship.y}]
+{L(t('КООРДИНАТЫ'))} [{Math.round(ship.x)}; {Math.round(ship.y)}]
+{L(t('КОРПУС'))} {ship.hp}/{ship.hpMax}
 {L(t('СТЫКОВКА'))} {ship.dockedObjectId ? t('ПРИСТЫКОВАН [U — РАССТЫКОВКА]') : t('СВОБОДНЫЙ ПОЛЁТ')}
 </pre>
   {/if}

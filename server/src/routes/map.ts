@@ -1,7 +1,8 @@
 import type { FastifyInstance } from 'fastify';
 import type { GalaxyMapResponse, SectorMapResponse, SectorObject } from '@tokencontrol/shared';
 import { and, eq } from 'drizzle-orm';
-import { knownObjects, objects, ships, visitedSectors } from '../db/schema';
+import { knownObjects, objects, visitedSectors } from '../db/schema';
+import { leadEntity } from '../game/entities';
 import { parseSectorId } from '../game/worldgen';
 
 export async function mapRoutes(app: FastifyInstance) {
@@ -11,14 +12,15 @@ export async function mapRoutes(app: FastifyInstance) {
     { preHandler: [app.authenticate] },
     async (req, reply): Promise<SectorMapResponse> => {
       const pid = req.user.pid;
-      const [shipRow] = await app.db.select().from(ships).where(eq(ships.playerId, pid));
-      if (!shipRow) return reply.code(404).send({ error: 'ship not found' });
+      // Карта показывает сектор ведущей сущности флота
+      const lead = await leadEntity(app.db, pid);
+      if (!lead) return reply.code(404).send({ error: 'entity not found' });
 
       const rows = await app.db
         .select({ obj: objects, level: knownObjects.level })
         .from(knownObjects)
         .innerJoin(objects, eq(knownObjects.objectId, objects.id))
-        .where(and(eq(knownObjects.playerId, pid), eq(objects.sectorId, shipRow.sectorId)));
+        .where(and(eq(knownObjects.playerId, pid), eq(objects.sectorId, lead.sectorId)));
 
       const known: SectorObject[] = rows.map(({ obj, level }) => ({
         id: obj.id,
@@ -31,7 +33,7 @@ export async function mapRoutes(app: FastifyInstance) {
         resourceAmount: level === 'analyzed' ? obj.resourceAmount : null,
       }));
 
-      return { sectorId: shipRow.sectorId, objects: known };
+      return { sectorId: lead.sectorId, objects: known };
     },
   );
 
@@ -43,8 +45,8 @@ export async function mapRoutes(app: FastifyInstance) {
       const pid = req.user.pid;
       const { world } = app.cfg;
 
-      const [shipRow] = await app.db.select().from(ships).where(eq(ships.playerId, pid));
-      if (!shipRow) return reply.code(404).send({ error: 'ship not found' });
+      const lead = await leadEntity(app.db, pid);
+      if (!lead) return reply.code(404).send({ error: 'entity not found' });
 
       const visited = await app.db
         .select({ sectorId: visitedSectors.sectorId })
@@ -52,7 +54,7 @@ export async function mapRoutes(app: FastifyInstance) {
         .where(eq(visitedSectors.playerId, pid));
 
       return {
-        currentSectorId: shipRow.sectorId,
+        currentSectorId: lead.sectorId,
         galaxyWidth: world.galaxyWidth,
         galaxyHeight: world.galaxyHeight,
         sectors: visited.map(({ sectorId }) => {

@@ -19,7 +19,7 @@
   }
 
   function onKey(e: KeyboardEvent) {
-    if (game.screen !== 'settings') return;
+    if (game.screen !== 'settings' || game.keysCaptured) return;
     if (e.key.toLowerCase() === 'c') game.toggleCrt();
     else if (e.key.toLowerCase() === 'e') i18n.toggle();
     else if (e.key.toLowerCase() === 'l') game.logout();

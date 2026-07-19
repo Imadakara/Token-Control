@@ -5,6 +5,8 @@ import type {
   ConfigResponse,
   GalaxyMapResponse,
   LogResponse,
+  OrdersAddResponse,
+  OrdersAvailableResponse,
   SectorMapResponse,
   StateResponse,
   WsServerMessage,
@@ -67,22 +69,42 @@ export const api = {
   sectorMap: () => request<SectorMapResponse>('/map/sector'),
   galaxyMap: () => request<GalaxyMapResponse>('/map/galaxy'),
   log: (cursor?: string) => request<LogResponse>(`/log${cursor ? `?cursor=${cursor}` : ''}`),
-  queueAdd: (action: ActionType, params: ActionParams | null) =>
-    request<StateResponse>('/queue/add', {
+  /** Что сущность (или весь флот, если entityId не задан) может сделать сейчас. */
+  ordersAvailable: (entityId?: string) =>
+    request<OrdersAvailableResponse>(`/orders/available${entityId ? `?entityId=${entityId}` : ''}`),
+  /** Приказ одной или нескольким сущностям (ТЗ v0.02 п. 3). */
+  ordersAdd: (entityIds: string[], action: ActionType, params: ActionParams | null) =>
+    request<OrdersAddResponse>('/orders/add', {
       method: 'POST',
-      body: JSON.stringify({ action, params }),
+      body: JSON.stringify({ entityIds, action, params }),
     }),
-  queueRemove: (slot: 1 | 2 | 3) =>
-    request<StateResponse>('/queue/remove', { method: 'POST', body: JSON.stringify({ slot }) }),
-  queueReorder: (from: 2 | 3, to: 2 | 3) =>
-    request<StateResponse>('/queue/reorder', {
+  ordersRemove: (entityId: string, slot: number) =>
+    request<StateResponse>('/orders/remove', {
       method: 'POST',
-      body: JSON.stringify({ from, to }),
+      body: JSON.stringify({ entityId, slot }),
     }),
-  undock: () => request<StateResponse>('/ship/undock', { method: 'POST' }),
+  ordersReorder: (entityId: string, from: number, to: number) =>
+    request<StateResponse>('/orders/reorder', {
+      method: 'POST',
+      body: JSON.stringify({ entityId, from, to }),
+    }),
+  fleetPriority: (entityIds: string[]) =>
+    request<StateResponse>('/fleet/priority', {
+      method: 'POST',
+      body: JSON.stringify({ entityIds }),
+    }),
+  fleetRename: (entityId: string, name: string) =>
+    request<StateResponse>('/fleet/rename', {
+      method: 'POST',
+      body: JSON.stringify({ entityId, name }),
+    }),
+  undock: (entityId: string) =>
+    request<StateResponse>('/ship/undock', { method: 'POST', body: JSON.stringify({ entityId }) }),
   /** Дебаг-команда (сервер пускает только капитана DEBUG). */
   debugCredit: (ovm: number) =>
     request<StateResponse>('/debug/credit', { method: 'POST', body: JSON.stringify({ ovm }) }),
+  debugSpawn: (classId: string) =>
+    request<StateResponse>('/debug/spawn', { method: 'POST', body: JSON.stringify({ classId }) }),
 };
 
 /** WS-подписка на пуши сервера; переподключение с бэкоффом. */

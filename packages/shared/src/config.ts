@@ -22,12 +22,22 @@ export interface GameConfig {
     maxOvmPerHour: number;
     maxOvmPerDay: number;
   };
-  /** Вместимость трюма (единая для MVP). */
+  /** Вместимость трюма по умолчанию; класс сущности может её переопределить. */
   cargoCapacity: number;
   /** Радиус «возле объекта» для стыковки/анализа/добычи/подбора. */
   nearDistance: number;
   /** Кулдаун исполнения активной задачи после набора стоимости, сек. */
   taskCooldownSec: number;
+  /** Слотов приказов на сущность (ТЗ v0.02 п. 3; MVP был жёстко 3). */
+  orderSlots: number;
+  /** Допуск «те же координаты» для группировки и приказов (ТЗ v0.02 п. 2.1). */
+  coordEpsilon: number;
+  /**
+   * Как один поток ОВМ делится между очередями сущностей.
+   * 'priority' — строго по приоритету с каскадом излишка (реализовано);
+   * 'split' — задел на пропорциональное деление, пока не реализован.
+   */
+  ovmAllocation: 'priority' | 'split';
 }
 
 export const DEFAULT_GAME_CONFIG: GameConfig = {
@@ -50,4 +60,7 @@ export const DEFAULT_GAME_CONFIG: GameConfig = {
   cargoCapacity: 100,
   nearDistance: 10,
   taskCooldownSec: 3,
+  orderSlots: 3,
+  coordEpsilon: 10,
+  ovmAllocation: 'priority',
 };

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_WORLD,
   generateSector,
+  pickHomeSector,
   sectorExists,
   sectorsAdjacent,
 } from '../src/game/worldgen';
@@ -30,12 +31,25 @@ describe('worldgen', () => {
   });
 
   it('границы галактики и соседство', () => {
+    const w = DEFAULT_WORLD.galaxyWidth;
+    const h = DEFAULT_WORLD.galaxyHeight;
     expect(sectorExists('0:0', DEFAULT_WORLD)).toBe(true);
-    expect(sectorExists('9:9', DEFAULT_WORLD)).toBe(true);
-    expect(sectorExists('10:5', DEFAULT_WORLD)).toBe(false);
+    expect(sectorExists(`${w - 1}:${h - 1}`, DEFAULT_WORLD)).toBe(true);
+    expect(sectorExists(`${w}:5`, DEFAULT_WORLD)).toBe(false);
     expect(sectorExists('x:y', DEFAULT_WORLD)).toBe(false);
     expect(sectorsAdjacent('5:5', '5:6')).toBe(true);
     expect(sectorsAdjacent('5:5', '6:6')).toBe(false);
     expect(sectorsAdjacent('5:5', '5:5')).toBe(false);
+  });
+
+  it('домашний сектор детерминирован по позывному и лежит в галактике', () => {
+    const a = pickHomeSector('dev:misha', DEFAULT_WORLD);
+    expect(pickHomeSector('dev:misha', DEFAULT_WORLD)).toBe(a);
+    expect(sectorExists(a, DEFAULT_WORLD)).toBe(true);
+    // Разные игроки в общем случае расселяются по разным секторам
+    const others = ['dev:a', 'dev:b', 'dev:c', 'dev:d'].map((p) =>
+      pickHomeSector(p, DEFAULT_WORLD),
+    );
+    expect(new Set(others).size).toBeGreaterThan(1);
   });
 });

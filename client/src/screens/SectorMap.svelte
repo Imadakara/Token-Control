@@ -1,8 +1,9 @@
 <script lang="ts">
-  import type { SectorObject } from '@tokencontrol/shared';
-  import { game } from '../lib/game.svelte';
+  import { ACTION_TYPES, type SectorObject } from '@tokencontrol/shared';
+  import { ACTION_LABELS, entityStatusText, game } from '../lib/game.svelte';
   import { t } from '../lib/i18n.svelte';
   import { keyOf } from '../lib/terminal/keys';
+  import ListPicker from '../lib/terminal/ListPicker.svelte';
 
   // Символьная карта: координаты сектора [-1000,1000] → сетка COLS×ROWS
   const COLS = 61;
@@ -13,9 +14,13 @@
   let cy = $state(Math.floor(ROWS / 2));
   let objIndex = $state(-1); // выбранный объект (Tab)
   let hoverId = $state<string | null>(null); // наведение в списке объектов
+  let ordering = $state(false); // окно выбора приказа для сущностей в клетке
 
   const objects = $derived(game.sector?.objects ?? []);
-  const ship = $derived(game.state?.ship ?? null);
+  /** Сущности флота в этом секторе (ТЗ v0.02 п. 2.1). */
+  const fleetHere = $derived(
+    game.entities.filter((e) => e.sectorId === game.sector?.sectorId),
+  );
 
   function toCell(x: number, y: number): [number, number] {
     const col = Math.round(((x + RANGE) / (2 * RANGE)) * (COLS - 1));
@@ -43,8 +48,9 @@
       const [col, row] = toCell(o.x, o.y);
       rows[row]![col] = SYMBOLS[o.type];
     }
-    if (ship) {
-      const [col, row] = toCell(ship.x, ship.y);
+    // Сущности рисуются последними — флот важнее фона
+    for (const e of fleetHere) {
+      const [col, row] = toCell(e.x, e.y);
       rows[row]![col] = '@';
     }
     return rows;
@@ -59,6 +65,14 @@
 
   /** Объект для инфо-панели: наведение приоритетнее курсора карты. */
   const infoObject = $derived(objects.find((o) => o.id === hoverId) ?? objectAtCursor);
+
+  /** Свои сущности в клетке под курсором — они же группа для приказа. */
+  const fleetAtCursor = $derived(
+    fleetHere.filter((e) => {
+      const [col, row] = toCell(e.x, e.y);
+      return col === cx && row === cy;
+    }),
+  );
 
   function cycleObject(dir: 1 | -1) {
     if (objects.length === 0) return;
@@ -84,7 +98,7 @@
         return;
       }
       void game.enqueue(pick.action, { kind: 'object', objectId: objectAtCursor.id });
-      game.screen = 'queue';
+      game.screen = 'orders';
     } else if (pick.target === 'point') {
       if (objectAtCursor) {
         void game.enqueue(pick.action, { kind: 'object', objectId: objectAtCursor.id });
@@ -92,12 +106,12 @@
         const [x, y] = toCoords(cx, cy);
         void game.enqueue(pick.action, { kind: 'point', x, y });
       }
-      game.screen = 'queue';
+      game.screen = 'orders';
     }
   }
 
   function onKey(e: KeyboardEvent) {
-    if (game.screen !== 'sector') return;
+    if (game.screen !== 'sector' || game.keysCaptured) return;
     const k = keyOf(e);
     if (k === 'ArrowLeft') cx = Math.max(0, cx - 1);
     else if (k === 'ArrowRight') cx = Math.min(COLS - 1, cx + 1);
@@ -106,7 +120,11 @@
     else if (k === 'Tab') {
       cycleObject(e.shiftKey ? -1 : 1);
       e.preventDefault();
-    } else if (k === 'Enter') confirm();
+    } else if (k === 'Enter') {
+      // В режиме выбора цели Enter подтверждает цель, иначе — приказ своим
+      if (game.pick) confirm();
+      else if (fleetAtCursor.length > 0) ordering = true;
+    }
   }
 </script>
 
@@ -131,14 +149,35 @@
             data-c={ci}
             data-r={ri}>{ch}</span>{/each}{'\n'}{/each}</pre>
     <p class="dim">
-      {t('@ КОРАБЛЬ')} &nbsp; {t('S СТАНЦИЯ')} &nbsp; {t('* АСТЕРОИД')} &nbsp;
+      {t('@ СВОЯ СУЩНОСТЬ')} &nbsp; {t('S СТАНЦИЯ')} &nbsp; {t('* АСТЕРОИД')} &nbsp;
       {t('c КОНТЕЙНЕР')} &nbsp; {t('~ ФЕНОМЕН')}
     </p>
   </div>
 
   <div class="right">
     <div class="panel side" onmouseleave={() => (hoverId = null)}>
-      <div class="panel-title">{t('ОБЪЕКТЫ')} ({objects.length})</div>
+      <div class="panel-title">{t('СВОИ СУЩНОСТИ')} ({fleetHere.length})</div>
+      {#each fleetHere as e (e.id)}
+        <div
+          class="selectable"
+          onclick={() => {
+            [cx, cy] = toCell(e.x, e.y);
+            game.selectedEntityId = e.id;
+          }}
+          ondblclick={() => {
+            [cx, cy] = toCell(e.x, e.y);
+            ordering = true;
+          }}
+          onkeydown={() => {}}
+          role="button"
+          tabindex="-1"
+        >
+          @ <span class="accent">{e.name}</span>
+          <span class="dim">[{Math.round(e.x)}; {Math.round(e.y)}]</span>
+        </div>
+      {/each}
+
+      <div class="panel-title objects-title">{t('ОБЪЕКТЫ')} ({objects.length})</div>
       {#if objects.length === 0}
         <p class="dim">{t('НЕТ ДАННЫХ — ВЫПОЛНИТЕ СКАНИРОВАНИЕ')}</p>
       {/if}
@@ -166,6 +205,15 @@
     </div>
 
     <div class="panel info">
+      {#if fleetAtCursor.length > 0}
+        <!-- Состояние сущности видно и здесь, не только во «Флотилии» (ТЗ v0.02 п. 2.1) -->
+        <div class="panel-title">{t('СУЩНОСТИ В ЭТИХ КООРДИНАТАХ')} ({fleetAtCursor.length})</div>
+        {#each fleetAtCursor as e (e.id)}
+          <pre>{e.name.padEnd(12)} {entityStatusText(e).padEnd(24)} {t('ТРЮМ')} {e.cargoUsed}/{e.cargoCapacity}</pre>
+        {/each}
+        <p class="dim">{t('[ENTER] ПРИКАЗ ЭТИМ СУЩНОСТЯМ')}</p>
+      {/if}
+
       <div class="panel-title">{t('ИНФОРМАЦИЯ ОБ ОБЪЕКТЕ')}</div>
       {#if infoObject}
         <pre>
@@ -188,6 +236,25 @@
     </div>
   </div>
 </div>
+
+{#if ordering && fleetAtCursor.length > 0}
+  <ListPicker
+    title={fleetAtCursor.length > 1
+      ? `${t('ПРИКАЗ ГРУППЕ')}: ${fleetAtCursor.length} ${t('СУЩН.')}`
+      : `${t('ПРИКАЗ')}: ${fleetAtCursor[0]!.name}`}
+    items={ACTION_TYPES}
+    label={(a) => t(ACTION_LABELS[a])}
+    note={(a) => `(${game.config?.actionCosts[a] ?? '?'} ${t('ОВМ')})`}
+    onpick={(a) => {
+      ordering = false;
+      void game.chooseAction(
+        a,
+        fleetAtCursor.map((e) => e.id),
+      );
+    }}
+    oncancel={() => (ordering = false)}
+  />
+{/if}
 
 <p class="dim">
   {t('[←↑↓→] КУРСОР [TAB] ЦЕЛИ [ENTER] ВЫБОР')}{game.pick ? ` ${t('[ESC] ОТМЕНА')}` : ''}
@@ -224,5 +291,8 @@
   .side {
     max-height: 45vh;
     overflow-y: auto;
+  }
+  .objects-title {
+    margin-top: 0.6rem;
   }
 </style>

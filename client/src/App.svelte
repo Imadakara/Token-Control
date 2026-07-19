@@ -1,41 +1,46 @@
 <script lang="ts">
   import Login from './Login.svelte';
   import Crt from './lib/terminal/Crt.svelte';
-  import { game, type Screen } from './lib/game.svelte';
+  import { game } from './lib/game.svelte';
+  import { SCREENS, screenDef } from './lib/screens';
   import { t } from './lib/i18n.svelte';
   import { bar, fmtOvm } from './lib/terminal/format';
   import { keyOf } from './lib/terminal/keys';
-  import Queue from './screens/Queue.svelte';
-  import SectorMap from './screens/SectorMap.svelte';
-  import GalaxyMap from './screens/GalaxyMap.svelte';
-  import Cargo from './screens/Cargo.svelte';
-  import Status from './screens/Status.svelte';
-  import Journal from './screens/Journal.svelte';
-  import Settings from './screens/Settings.svelte';
-
-  const MENU: { key: string; id: Screen; label: string }[] = [
-    { key: '1', id: 'queue', label: 'ОЧЕРЕДЬ' },
-    { key: '2', id: 'sector', label: 'СЕКТОР' },
-    { key: '3', id: 'galaxy', label: 'ГАЛАКТИКА' },
-    { key: '4', id: 'cargo', label: 'ТРЮМ' },
-    { key: '5', id: 'status', label: 'СТАТУС' },
-    { key: '6', id: 'journal', label: 'ЖУРНАЛ' },
-    { key: '7', id: 'settings', label: 'НАСТРОЙКИ' },
-  ];
 
   if (game.authorized) void game.start();
 
-  const activeTask = $derived(game.state?.queue.find((q) => q.slot === 1) ?? null);
+  const Current = $derived(screenDef(game.screen).component);
+
+  /** Приказ, который сейчас получает поток ОВМ (ТЗ v0.02 п. 3: буфер общий). */
+  const flowEntity = $derived(
+    game.entities.find((e) => e.orders[0]?.status === 'active') ?? null,
+  );
+  const activeOrder = $derived(flowEntity?.orders[0] ?? null);
+
+  function cycleScreen(dir: 1 | -1) {
+    const i = SCREENS.findIndex((s) => s.id === game.screen);
+    game.screen = SCREENS[(i + dir + SCREENS.length) % SCREENS.length]!.id;
+  }
 
   function onKey(e: KeyboardEvent) {
     if (!game.authorized) return;
+    // Модалка открыта или курсор в текстовом поле — клавиши не наши
+    if (game.keysCaptured) return;
+    // Модификаторы принадлежат браузеру/ОС, а не игровому меню
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
     const k = keyOf(e);
     if (k === 'Escape') {
       game.cancelPick();
       return;
     }
-    const item = MENU.find((m) => m.key === k);
-    if (item && !game.pick) game.screen = item.id;
+    if (game.pick) return;
+    if (k === 'Tab') {
+      cycleScreen(e.shiftKey ? -1 : 1);
+      e.preventDefault();
+      return;
+    }
+    const item = SCREENS.find((s) => s.key === k);
+    if (item) game.screen = item.id;
   }
 </script>
 
@@ -53,18 +58,19 @@
         {game.online ? t('● СВЯЗЬ') : t('○ НЕТ СВЯЗИ')}
       </span>
       <span>{t('ПОТОК:')} <span class="accent">{fmtOvm(game.ratePerMin)}</span> {t('ОВМ/МИН')}</span>
-      {#if activeTask}
+      {#if activeOrder && flowEntity}
         <span>
-          {t('СЛОТ 1:')} <span class="accent">{bar(activeTask.progressOvm, activeTask.costOvm, 16)}</span>
-          {Math.floor((activeTask.progressOvm / activeTask.costOvm) * 100)}%
+          {flowEntity.name}:
+          <span class="accent">{bar(activeOrder.progressOvm, activeOrder.costOvm, 16)}</span>
+          {Math.floor((activeOrder.progressOvm / activeOrder.costOvm) * 100)}%
         </span>
       {:else}
-        <span class="dim">{t('ОЧЕРЕДЬ ПУСТА → БУФЕР')} {fmtOvm(game.state?.ovmBuffer ?? 0)}</span>
+        <span class="dim">{t('ПРИКАЗОВ НЕТ → БУФЕР')} {fmtOvm(game.state?.ovmBuffer ?? 0)}</span>
       {/if}
     </header>
 
     <nav>
-      {#each MENU as item (item.id)}
+      {#each SCREENS as item (item.id)}
         <button
           class:active={game.screen === item.id}
           onclick={() => !game.pick && (game.screen = item.id)}
@@ -76,13 +82,7 @@
     </nav>
 
     <main>
-      {#if game.screen === 'queue'}<Queue />
-      {:else if game.screen === 'sector'}<SectorMap />
-      {:else if game.screen === 'galaxy'}<GalaxyMap />
-      {:else if game.screen === 'cargo'}<Cargo />
-      {:else if game.screen === 'status'}<Status />
-      {:else if game.screen === 'journal'}<Journal />
-      {:else if game.screen === 'settings'}<Settings />{/if}
+      <Current />
     </main>
 
     <footer>

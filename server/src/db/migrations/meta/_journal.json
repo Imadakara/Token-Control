@@ -22,6 +22,20 @@
       "when": 1784377422688,
       "tag": "0002_queue_activated_at",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1784414796763,
+      "tag": "0003_entities",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1784414843053,
+      "tag": "0004_drop_ships",
+      "breakpoints": true
     }
   ]
 }

@@ -3,13 +3,18 @@
   import { t } from '../lib/i18n.svelte';
   import { bar, pad } from '../lib/terminal/format';
 
-  const items = $derived(game.state?.cargo ?? []);
-  const used = $derived(items.reduce((s, i) => s + i.qty, 0));
-  const cap = $derived(game.state?.cargoCapacity ?? 0);
+  /**
+   * Трюм принадлежит сущности, а не игроку (ТЗ v0.02 п. 3.2: добыча физически
+   * локализована). Показываем выбранную во «Флотилии» сущность, иначе ведущую.
+   */
+  const entity = $derived(game.selectedEntity);
+  const items = $derived(entity?.cargo ?? []);
+  const used = $derived(entity?.cargoUsed ?? 0);
+  const cap = $derived(entity?.cargoCapacity ?? 0);
 </script>
 
 <div class="panel">
-  <div class="panel-title">{t('ТРЮМ')}</div>
+  <div class="panel-title">{t('ТРЮМ')}{entity ? `: ${entity.name}` : ''}</div>
   <pre>{t('ЗАНЯТО:')} {bar(used, cap, 30)} {used}/{cap}</pre>
   {#if items.length === 0}
     <p class="dim">{t('ТРЮМ ПУСТ')}</p>

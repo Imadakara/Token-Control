@@ -1,7 +1,8 @@
 import type { ActionParams, ActionType } from '@tokencontrol/shared';
 import { and, eq, sql } from 'drizzle-orm';
-import { cargo, knownObjects, objects, ships } from '../db/schema';
+import { cargo, entities, knownObjects, objects } from '../db/schema';
 import type { ServerConfig } from './config';
+import { entityClass, type EntityRow } from './entities';
 import { cargoUsed, type DbLike } from './state';
 import { ensureSectorGenerated, markVisited } from './world';
 import { sectorExists, sectorsAdjacent } from './worldgen';
@@ -10,6 +11,9 @@ import { sectorExists, sectorsAdjacent } from './worldgen';
  * Условия применимости и результаты действий (ТЗ п. 6).
  * validate вызывается на постановке и на старте выполнения; execute — при
  * завершении (набран счётчик ОВМ). Всё выполняется внутри транзакции.
+ *
+ * Исполнитель передаётся явным аргументом `entity`: приказы отдаются сущностям
+ * флота, а не «кораблю игрока» (ТЗ v0.02 п. 3).
  */
 
 export interface ActionCtx {
@@ -22,48 +26,56 @@ export interface ActionCtx {
 
 export type Validation = { ok: true } | { ok: false; reason: string };
 
-type ShipRow = typeof ships.$inferSelect;
 type ObjectRow = typeof objects.$inferSelect;
-
-async function getShip(ctx: ActionCtx): Promise<ShipRow> {
-  const [ship] = await ctx.db.select().from(ships).where(eq(ships.playerId, ctx.pid));
-  if (!ship) throw new Error(`no ship for ${ctx.pid}`);
-  return ship;
-}
 
 async function getObject(ctx: ActionCtx, objectId: string): Promise<ObjectRow | null> {
   const [obj] = await ctx.db.select().from(objects).where(eq(objects.id, objectId));
   return obj ?? null;
 }
 
-function isNear(ship: ShipRow, obj: ObjectRow, cfg: ServerConfig): boolean {
-  if (obj.sectorId !== ship.sectorId) return false;
-  return Math.hypot(ship.x - obj.x, ship.y - obj.y) <= cfg.game.nearDistance;
+function isNear(entity: EntityRow, obj: ObjectRow, cfg: ServerConfig): boolean {
+  if (obj.sectorId !== entity.sectorId) return false;
+  return Math.hypot(entity.x - obj.x, entity.y - obj.y) <= cfg.game.nearDistance;
 }
 
 async function nearObjectFromParams(
   ctx: ActionCtx,
+  entity: EntityRow,
   params: ActionParams | null,
-): Promise<{ ship: ShipRow; obj: ObjectRow } | { reason: string }> {
+): Promise<{ obj: ObjectRow } | { reason: string }> {
   if (!params || params.kind !== 'object') return { reason: 'НЕ УКАЗАНА ЦЕЛЬ' };
-  const ship = await getShip(ctx);
   const obj = await getObject(ctx, params.objectId);
   if (!obj) return { reason: 'ОБЪЕКТ НЕ СУЩЕСТВУЕТ' };
-  if (!isNear(ship, obj, ctx.cfg)) return { reason: 'КОРАБЛЬ НЕ ВОЗЛЕ ОБЪЕКТА' };
-  return { ship, obj };
+  if (!isNear(entity, obj, ctx.cfg)) return { reason: 'СУЩНОСТЬ НЕ ВОЗЛЕ ОБЪЕКТА' };
+  return { obj };
+}
+
+/** Свободное место в трюме конкретной сущности. */
+async function cargoFull(ctx: ActionCtx, entity: EntityRow): Promise<boolean> {
+  const used = await cargoUsed(ctx.db, entity.id);
+  return used >= entityClass(entity).cargoCapacity;
 }
 
 /**
- * Режимы валидации (ТЗ п. 5):
+ * Режимы валидации (ТЗ п. 5, ТЗ v0.02 п. 3.1):
  * - enqueue: постановка в очередь. Проверяются только статические условия
  *   (цель существует, параметры корректны) — позиционные условия («возле»)
  *   выполнит предыдущая задача очереди (прыжок → анализ).
  * - activate: старт выполнения. Полная проверка; провал → «НЕВЫПОЛНИМО».
+ * - offer: «показать в списке доступных приказов» (game/orders.ts), когда
+ *   конкретной цели ещё нет — игрок только выбирает приказ, точку/сектор
+ *   назовёт следующим шагом на карте. Отличается от enqueue/activate только
+ *   для приказов с точечной/секторной целью (jump_local, jump_hyper): для них
+ *   отсутствие params — не отказ, а норма. Для приказов с целью-объектом
+ *   (analyze/mine/pickup) offer не используется — listOrders сам ищет
+ *   кандидатов среди известных игроку объектов и проверяет их через activate,
+ *   так что список никогда не предложит то, что отклонит addTask.
  */
-export type ValidateMode = 'enqueue' | 'activate';
+export type ValidateMode = 'enqueue' | 'activate' | 'offer';
 
 export async function validateAction(
   ctx: ActionCtx,
+  entity: EntityRow,
   action: ActionType,
   params: ActionParams | null,
   mode: ValidateMode,
@@ -73,35 +85,37 @@ export async function validateAction(
       return { ok: true };
 
     case 'jump_local': {
-      if (!params || (params.kind !== 'point' && params.kind !== 'object'))
+      if (!entityClass(entity).mobile) return { ok: false, reason: 'СУЩНОСТЬ НЕПОДВИЖНА' };
+      if (!params || (params.kind !== 'point' && params.kind !== 'object')) {
+        // В списке приказов цель ещё не выбрана — это нормально, не отказ
+        if (mode === 'offer') return { ok: true };
         return { ok: false, reason: 'НУЖНА ТОЧКА ИЛИ ЦЕЛЬ' };
+      }
       if (params.kind === 'object') {
         const obj = await getObject(ctx, params.objectId);
         if (!obj) return { ok: false, reason: 'ЦЕЛЬ НЕ СУЩЕСТВУЕТ' };
-        if (mode === 'activate') {
-          const ship = await getShip(ctx);
-          if (obj.sectorId !== ship.sectorId)
-            return { ok: false, reason: 'ЦЕЛЬ НЕ В ТЕКУЩЕМ СЕКТОРЕ' };
-        }
+        if (mode === 'activate' && obj.sectorId !== entity.sectorId)
+          return { ok: false, reason: 'ЦЕЛЬ НЕ В ТЕКУЩЕМ СЕКТОРЕ' };
       }
       return { ok: true };
     }
 
     case 'jump_hyper': {
-      if (!params || params.kind !== 'sector') return { ok: false, reason: 'НЕ УКАЗАН СЕКТОР' };
+      if (!entityClass(entity).mobile) return { ok: false, reason: 'СУЩНОСТЬ НЕПОДВИЖНА' };
+      if (!params || params.kind !== 'sector') {
+        if (mode === 'offer') return { ok: true };
+        return { ok: false, reason: 'НЕ УКАЗАН СЕКТОР' };
+      }
       if (!sectorExists(params.sectorId, ctx.cfg.world))
         return { ok: false, reason: 'СЕКТОР ВНЕ ГАЛАКТИКИ' };
-      if (mode === 'activate') {
-        const ship = await getShip(ctx);
-        if (!sectorsAdjacent(ship.sectorId, params.sectorId))
-          return { ok: false, reason: 'ТОЛЬКО СОСЕДНИЕ СЕКТОРА (MVP)' };
-      }
+      if (mode === 'activate' && !sectorsAdjacent(entity.sectorId, params.sectorId))
+        return { ok: false, reason: 'ТОЛЬКО СОСЕДНИЕ СЕКТОРА (MVP)' };
       return { ok: true };
     }
 
     case 'dock': {
       if (mode === 'enqueue') return { ok: true };
-      const station = await findNearbyStation(ctx);
+      const station = await findNearbyStation(ctx, entity);
       return station ? { ok: true } : { ok: false, reason: 'НЕТ СТАНЦИИ В ЗОНЕ СТЫКОВКИ' };
     }
 
@@ -111,7 +125,7 @@ export async function validateAction(
         const obj = await getObject(ctx, params.objectId);
         return obj ? { ok: true } : { ok: false, reason: 'ОБЪЕКТ НЕ СУЩЕСТВУЕТ' };
       }
-      const r = await nearObjectFromParams(ctx, params);
+      const r = await nearObjectFromParams(ctx, entity, params);
       return 'reason' in r ? { ok: false, reason: r.reason } : { ok: true };
     }
 
@@ -123,12 +137,11 @@ export async function validateAction(
         if (!obj.resourceType) return { ok: false, reason: 'ОБЪЕКТ БЕЗ РЕСУРСА' };
         return { ok: true };
       }
-      const r = await nearObjectFromParams(ctx, params);
+      const r = await nearObjectFromParams(ctx, entity, params);
       if ('reason' in r) return { ok: false, reason: r.reason };
       if (!r.obj.resourceType || (r.obj.resourceAmount ?? 0) <= 0)
         return { ok: false, reason: 'РЕСУРС ИСЧЕРПАН' };
-      if ((await cargoUsed(ctx.db, ctx.pid)) >= ctx.cfg.game.cargoCapacity)
-        return { ok: false, reason: 'ТРЮМ ПЕРЕПОЛНЕН' };
+      if (await cargoFull(ctx, entity)) return { ok: false, reason: 'ТРЮМ ПЕРЕПОЛНЕН' };
       return { ok: true };
     }
 
@@ -140,40 +153,38 @@ export async function validateAction(
         if (obj.type !== 'container') return { ok: false, reason: 'ОБЪЕКТ НЕ ПОДБИРАЕМ' };
         return { ok: true };
       }
-      const r = await nearObjectFromParams(ctx, params);
+      const r = await nearObjectFromParams(ctx, entity, params);
       if ('reason' in r) return { ok: false, reason: r.reason };
       if (r.obj.type !== 'container') return { ok: false, reason: 'ОБЪЕКТ НЕ ПОДБИРАЕМ' };
-      if ((await cargoUsed(ctx.db, ctx.pid)) >= ctx.cfg.game.cargoCapacity)
-        return { ok: false, reason: 'ТРЮМ ПЕРЕПОЛНЕН' };
+      if (await cargoFull(ctx, entity)) return { ok: false, reason: 'ТРЮМ ПЕРЕПОЛНЕН' };
       return { ok: true };
     }
   }
 }
 
-async function findNearbyStation(ctx: ActionCtx): Promise<ObjectRow | null> {
-  const ship = await getShip(ctx);
+async function findNearbyStation(ctx: ActionCtx, entity: EntityRow): Promise<ObjectRow | null> {
   const stations = await ctx.db
     .select()
     .from(objects)
-    .where(and(eq(objects.sectorId, ship.sectorId), eq(objects.type, 'station')));
-  return stations.find((s) => isNear(ship, s, ctx.cfg)) ?? null;
+    .where(and(eq(objects.sectorId, entity.sectorId), eq(objects.type, 'station')));
+  return stations.find((s) => isNear(entity, s, ctx.cfg)) ?? null;
 }
 
 /** Выполняет результат действия; возвращает строку для журнала. */
 export async function executeAction(
   ctx: ActionCtx,
+  entity: EntityRow,
   action: ActionType,
   params: ActionParams | null,
 ): Promise<string> {
   const { db, cfg, pid } = ctx;
   switch (action) {
     case 'scan': {
-      const ship = await getShip(ctx);
-      await ensureSectorGenerated(db, ship.sectorId, cfg.world);
+      await ensureSectorGenerated(db, entity.sectorId, cfg.world);
       const objs = await db
         .select({ id: objects.id })
         .from(objects)
-        .where(eq(objects.sectorId, ship.sectorId));
+        .where(eq(objects.sectorId, entity.sectorId));
       if (objs.length > 0) {
         await db
           .insert(knownObjects)
@@ -198,29 +209,32 @@ export async function executeAction(
         label = `[${p.x}; ${p.y}]`;
       }
       await db
-        .update(ships)
+        .update(entities)
         .set({ x, y, dockedObjectId: null })
-        .where(eq(ships.playerId, pid));
-      return `ПРЫЖОК ВЫПОЛНЕН: ${label}`;
+        .where(eq(entities.id, entity.id));
+      return `ПРЫЖОК ВЫПОЛНЕН: ${entity.name} → ${label}`;
     }
 
     case 'jump_hyper': {
       const p = params as Extract<ActionParams, { kind: 'sector' }>;
       await ensureSectorGenerated(db, p.sectorId, cfg.world);
       await db
-        .update(ships)
+        .update(entities)
         .set({ sectorId: p.sectorId, x: 0, y: 0, dockedObjectId: null })
-        .where(eq(ships.playerId, pid));
+        .where(eq(entities.id, entity.id));
       await markVisited(db, pid, p.sectorId);
-      return `ГИПЕРПРЫЖОК ВЫПОЛНЕН: СЕКТОР ${p.sectorId}`;
+      return `ГИПЕРПРЫЖОК ВЫПОЛНЕН: ${entity.name} → СЕКТОР ${p.sectorId}`;
     }
 
     case 'dock': {
-      const station = await findNearbyStation(ctx);
+      const station = await findNearbyStation(ctx, entity);
       if (!station) return 'СТЫКОВКА ОТМЕНЕНА: СТАНЦИЯ НЕДОСТУПНА';
-      await db.update(ships).set({ dockedObjectId: station.id }).where(eq(ships.playerId, pid));
+      await db
+        .update(entities)
+        .set({ dockedObjectId: station.id })
+        .where(eq(entities.id, entity.id));
       const name = (station.props as { name?: string }).name ?? 'СТАНЦИЯ';
-      return `ПРИСТЫКОВАН: ${name}`;
+      return `ПРИСТЫКОВАН: ${entity.name} → ${name}`;
     }
 
     case 'analyze': {
@@ -250,12 +264,16 @@ export async function executeAction(
             left <= 0 ? new Date(Date.now() + cfg.world.respawnMinutes * 60_000) : obj.respawnAt,
         })
         .where(eq(objects.id, obj.id));
-      // Порция ресурса в трюм: upsert строки ресурса
+      // Порция ресурса в трюм добывающей сущности: upsert строки ресурса
       const [existing] = await db
         .select()
         .from(cargo)
         .where(
-          and(eq(cargo.playerId, pid), eq(cargo.kind, 'resource'), eq(cargo.itemType, obj.resourceType)),
+          and(
+            eq(cargo.entityId, entity.id),
+            eq(cargo.kind, 'resource'),
+            eq(cargo.itemType, obj.resourceType),
+          ),
         );
       if (existing) {
         await db
@@ -263,9 +281,13 @@ export async function executeAction(
           .set({ qty: sql`${cargo.qty} + 1` })
           .where(eq(cargo.id, existing.id));
       } else {
-        await db
-          .insert(cargo)
-          .values({ playerId: pid, kind: 'resource', itemType: obj.resourceType, qty: 1 });
+        await db.insert(cargo).values({
+          entityId: entity.id,
+          playerId: pid,
+          kind: 'resource',
+          itemType: obj.resourceType,
+          qty: 1,
+        });
       }
       return `ДОБЫТО: ${obj.resourceType.toUpperCase()} x1 (ОСТАТОК: ${left})`;
     }
@@ -275,6 +297,7 @@ export async function executeAction(
       const obj = await getObject(ctx, p.objectId);
       if (!obj) return 'ПОДБОР ОТМЕНЁН: ОБЪЕКТ ИСЧЕЗ';
       await db.insert(cargo).values({
+        entityId: entity.id,
         playerId: pid,
         kind: 'object',
         itemType: `${obj.type}:${(obj.props as { contents?: string }).contents ?? 'unknown'}`,

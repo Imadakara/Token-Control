@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { and, eq, lte, sql } from 'drizzle-orm';
 import { queues } from '../db/schema';
-import { pushQueueEvents } from '../routes/queue';
+import { pushQueueEvents } from '../routes/state-push';
 import type { QueueEvent } from './queue';
 import { applyOvm, lockPlayer } from './queue';
 import { buildState } from './state';
@@ -13,6 +13,8 @@ import { buildState } from './state';
  */
 export async function sweepQueueCompletions(app: FastifyInstance): Promise<void> {
   const cooldownMs = app.cfg.game.taskCooldownSec * 1000;
+  // Приказы ведутся по сущностям, но начисления сериализуются по игроку:
+  // берём игроков, у кого хоть одна сущность готова исполнить приказ.
   const due = await app.db
     .selectDistinct({ playerId: queues.playerId })
     .from(queues)

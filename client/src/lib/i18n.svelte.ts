@@ -19,7 +19,8 @@ const EN: Record<string, string> = {
   'ПОТОК:': 'FLOW:',
   'ОВМ/МИН': 'CPP/MIN',
   'СЛОТ 1:': 'SLOT 1:',
-  'ОЧЕРЕДЬ ПУСТА → БУФЕР': 'QUEUE EMPTY → BUFFER',
+  'ФЛОТИЛИЯ': 'FLEET',
+  'ПРИКАЗОВ НЕТ → БУФЕР': 'NO ORDERS → BUFFER',
   'СИСТЕМЫ В НОРМЕ': 'ALL SYSTEMS NOMINAL',
 
   // Вход
@@ -29,7 +30,59 @@ const EN: Record<string, string> = {
   'ВХОД': 'LOGIN',
   'ОТКАЗ:': 'DENIED:',
 
+  // Флотилия (ТЗ v0.02 п. 2)
+  'ИНФОРМАЦИЯ О СУЩНОСТИ': 'ENTITY INFO',
+  'НЕТ СУЩНОСТЕЙ': 'NO ENTITIES',
+  'НАЗВАНИЕ': 'NAME',
+  'КЛАСС': 'CLASS',
+  'ПРИОРИТЕТ ОВМ': 'CPP PRIORITY',
+  'КОРПУС': 'HULL',
+  'МОДУЛИ': 'MODULES',
+  'НЕТ': 'NONE',
+  'В ГРУППЕ': 'IN GROUP',
+  'СУЩНОСТЕЙ В ЭТИХ КООРДИНАТАХ': 'ENTITIES AT THESE COORDINATES',
+  'СУЩНОСТИ В ЭТИХ КООРДИНАТАХ': 'ENTITIES AT THESE COORDINATES',
+  'СВОИ СУЩНОСТИ': 'OWN ENTITIES',
+  'СУЩН.': 'ENT.',
+  'ПРИКАЗ': 'ORDER',
+  'ПРИКАЗЫ': 'ORDERS',
+  'ПРИКАЗ ГРУППЕ': 'GROUP ORDER',
+  'ПРИКАЗОВ НЕТ': 'NO ORDERS',
+  'ПРИКАЗ ОТДАН:': 'ORDER ISSUED:',
+  'ПРИКАЗ ОТМЕНЁН — ПРОГРЕСС СГОРЕЛ': 'ORDER CANCELLED — PROGRESS LOST',
+  'ДОСТУПНЫЕ ПРИКАЗЫ': 'AVAILABLE ORDERS',
+  'НЕДОСТУПНЫЕ': 'UNAVAILABLE',
+  'ОТМЕНИТЬ ПРИКАЗ? НАКОПЛЕННЫЙ ПРОГРЕСС СГОРИТ.': 'CANCEL ORDER? ACCUMULATED PROGRESS WILL BE LOST.',
+  '[↑↓] ВЫБОР [←→] СВЕРНУТЬ/РАЗВЕРНУТЬ [ENTER] ВЫБРАТЬ/ОТМЕНИТЬ':
+    '[↑↓] SELECT [←→] COLLAPSE/EXPAND [ENTER] PICK/CANCEL',
+  'СТАТУС СУЩНОСТИ': 'ENTITY STATUS',
+  'НАВЕДИТЕ КУРСОР НА СУЩНОСТЬ В СПИСКЕ': 'HOVER AN ENTITY IN THE LIST',
+  '[ENTER] ПРИКАЗ ЭТИМ СУЩНОСТЯМ': '[ENTER] ORDER THESE ENTITIES',
+  '[↑↓] ВЫБОР [ENTER] ПРИКАЗ [R] ПЕРЕИМЕНОВАТЬ [+/-] ПРИОРИТЕТ ОВМ':
+    '[↑↓] SELECT [ENTER] ORDER [R] RENAME [+/-] CPP PRIORITY',
+  'НОВОЕ ИМЯ:': 'NEW NAME:',
+  'СУЩНОСТЬ ПЕРЕИМЕНОВАНА': 'ENTITY RENAMED',
+  'НЕТ ВАРИАНТОВ': 'NO OPTIONS',
+  // Статусы сущностей
+  'ПРОСТОЙ': 'IDLE',
+  'ВЫПОЛНЯЕТ': 'EXECUTING',
+  'ОЖИДАНИЕ ПОТОКА': 'AWAITING FLOW',
+  'ПРИСТЫКОВАН': 'DOCKED',
+  'ПОВРЕЖДЁН': 'DAMAGED',
+  // Классы и модули
+  'РАЗВЕДЧИК MK1': 'SCOUT MK1',
+  'ГРУЗОВОЗ MK1': 'HAULER MK1',
+  'МЕЖЗВЁЗДНЫЕ ВРАТА': 'INTERSTELLAR GATE',
+  'БУРОВОЙ ЛАЗЕР': 'MINING LASER',
+  'РЕЛЬСОТРОН': 'RAILGUN',
+  'ПЕРЕРАБОТЧИК': 'REFINERY',
+  'СКАНЕРНАЯ РЕШЁТКА': 'SURVEY ARRAY',
+
   // Очередь
+  'ОЧЕРЕДЬ ПРИКАЗОВ': 'ORDER QUEUE',
+  'ОТМЕНИТЬ ПРИКАЗ В СЛОТЕ': 'CANCEL ORDER IN SLOT',
+  '[A] ДОБАВИТЬ [D/DEL] УДАЛИТЬ [+/-] ПЕРЕСТАВИТЬ [↑↓] ВЫБОР':
+    '[A] ADD [D/DEL] REMOVE [+/-] REORDER [↑↓] SELECT',
   'ОЧЕРЕДЬ ЗАДАЧ БОРТОВОГО КОМПЬЮТЕРА': 'SHIPBOARD COMPUTER TASK QUEUE',
   'СЛОТ': 'SLOT',
   '— ПУСТО': '— EMPTY',
@@ -57,7 +110,7 @@ const EN: Record<string, string> = {
   // Карты
   'КАРТА СЕКТОРА': 'SECTOR MAP',
   '— РЕЖИМ ВЫБОРА ЦЕЛИ': '— TARGET SELECT MODE',
-  '@ КОРАБЛЬ': '@ SHIP',
+  '@ СВОЯ СУЩНОСТЬ': '@ OWN ENTITY',
   'S СТАНЦИЯ': 'S STATION',
   '* АСТЕРОИД': '* ASTEROID',
   'c КОНТЕЙНЕР': 'c CONTAINER',

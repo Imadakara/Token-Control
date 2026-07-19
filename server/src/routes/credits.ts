@@ -3,7 +3,7 @@ import type { CreditsSubmitRequest } from '@tokencontrol/shared';
 import { submitCredits } from '../game/credits';
 import type { QueueEvent } from '../game/queue';
 import { buildState } from '../game/state';
-import { pushQueueEvents } from './queue';
+import { pushQueueEvents } from './state-push';
 
 export async function creditsRoutes(app: FastifyInstance) {
   /** Пакеты начислений от коннектора (ТЗ п. 7.4); идемпотентно по packetSeq. */

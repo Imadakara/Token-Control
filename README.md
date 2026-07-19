@@ -5,6 +5,7 @@
 - ТЗ: `Personal Vault/Token Control Docs/ТЗ - MVP - Token Control v0.01.md`
 - План разработки и статус фаз: [docs/PLAN.md](docs/PLAN.md)
 - Документация реализации фаз 1–5: [docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md)
+- План развития до стратегии (ТЗ v0.02, фазы 6–13): [docs/Strategy - Plan.md](docs/Strategy%20-%20Plan.md)
 
 ## Как запустить
 
