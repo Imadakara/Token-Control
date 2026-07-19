@@ -1,5 +1,6 @@
 import {
   ACTION_TYPES,
+  ENTITY_CLASSES,
   type ActionParams,
   type ActionType,
   type EntityState,
@@ -59,6 +60,29 @@ export async function checkConnection(): Promise<boolean> {
     return res.ok;
   } catch {
     return false;
+  }
+}
+
+/**
+ * Живая проверка наличия конкретной модели по текущему адресу — в отличие
+ * от ollamaAutoStatus.modelAvailable, которая обновляется один раз при входе
+ * в игру (ensureOllamaRunning) и может устареть: sidecar мог подняться уже
+ * ПОСЛЕ той проверки, либо игрок сменил адрес/модель в Настройках. Вызывается
+ * при открытии экранов Ассистента/Настроек и повторно прямо перед показом
+ * диалога загрузки — чтобы «скачать модель» не могло появиться на экране без
+ * свежей проверки того, что модели действительно нет.
+ */
+export async function refreshModelAvailability(): Promise<boolean | null> {
+  try {
+    const res = await httpFetch(`${assistantSettings.baseUrl}/models`, { method: 'GET' });
+    if (!res.ok) return null;
+    const body = (await res.json()) as { data?: { id: string }[] | null };
+    const available = (body.data ?? []).some((m) => m.id === assistantSettings.model);
+    ollamaAutoStatus.state = 'running';
+    ollamaAutoStatus.modelAvailable = available;
+    return available;
+  } catch {
+    return null;
   }
 }
 
@@ -163,10 +187,10 @@ const TOOLS = [
       name: 'issue_order',
       description:
         'Поставить приказ сущности флота игрока. Значения полей БЕРИ ТОЛЬКО из ' +
-        'сводки флота, приложенной в system-сообщении (строки вида "- ИМЯ ' +
-        '[класс, статус, сектор]: приказ(цели: МЕТКА1, МЕТКА2)") — никогда не ' +
-        'копируй значения из описания этой функции, здесь только формат полей, ' +
-        'не реальные данные. ВСЕГДА используй именно эти имена полей — ' +
+        'сводки флота, приложенной в system-сообщении (строки вида \'- «ИМЯ» ' +
+        '(класс: ..., статус: ..., сектор: ...): приказ(цели: МЕТКА1, МЕТКА2)\') — ' +
+        'никогда не копируй значения из описания этой функции, здесь только формат ' +
+        'полей, не реальные данные. ВСЕГДА используй именно эти имена полей — ' +
         'entityName, action, targetLabel/sectorId/x/y — никаких других имён полей.',
       parameters: {
         type: 'object',
@@ -174,8 +198,9 @@ const TOOLS = [
           entityName: {
             type: 'string',
             description:
-              'Точное имя сущности из сводки флота (часть до квадратной скобки), без ' +
-              'класса и статуса. Копируй символы как есть — если имя написано ' +
+              'Имя сущности — ТОЛЬКО текст в кавычках-«ёлочках» «...» в начале строки ' +
+              'сводки флота. Это НЕ класс (то, что после "класс:") и НЕ статус. ' +
+              'Копируй символы как есть, без кавычек-«ёлочек» — если имя написано ' +
               'кириллицей, не заменяй буквы на похожую латиницу.',
           },
           action: {
@@ -233,7 +258,8 @@ export function buildFleetContext(
         }
         return o.action;
       });
-    return `- ${e.name} [${e.classId}, ${e.status}, сектор ${e.sectorId}]: ${
+    const className = ENTITY_CLASSES[e.classId]?.title ?? e.classId;
+    return `- «${e.name}» (класс: ${className}, статус: ${e.status}, сектор: ${e.sectorId}): ${
       parts.length > 0 ? parts.join('; ') : 'нет доступных приказов'
     }`;
   });
@@ -340,12 +366,21 @@ function findEntityByName(state: StateResponse, name: string): EntityState | und
   return (
     state.entities.find((e) => e.name.toLowerCase() === lower) ??
     state.entities.find((e) => e.name.toLowerCase().includes(lower)) ??
+    // Модель иногда копирует не только имя, но и весь описательный кусок
+    // сводки вокруг него («ИМЯ» (класс: ..., статус: ...)) — ищем известное
+    // имя сущности КАК ПОДСТРОКУ внутри такого «мусорного» аргумента.
+    state.entities.find((e) => lower.includes(e.name.toLowerCase())) ??
     state.entities.find((e) => translitKey(e.name) === key)
   );
 }
 
+/** Модель иногда копирует и обрамляющие кавычки-«ёлочки» из сводки флота. */
+function stripQuotes(s: string): string {
+  return s.trim().replace(/^[«"']+|[»"']+$/g, '');
+}
+
 function resolveIssueOrder(args: Record<string, unknown>, ctx: AssistantCtx): ResolvedCall {
-  const entityName = typeof args.entityName === 'string' ? args.entityName : '';
+  const entityName = typeof args.entityName === 'string' ? stripQuotes(args.entityName) : '';
   const action = typeof args.action === 'string' ? args.action : '';
   if (!entityName) return { kind: 'error', message: 'Ассистент не указал сущность.' };
   const entity = findEntityByName(ctx.state, entityName);

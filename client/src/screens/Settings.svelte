@@ -5,6 +5,7 @@
     checkConnection,
     ollamaAutoStatus,
     pullModel,
+    refreshModelAvailability,
   } from '../lib/assistant.svelte';
   import { connector } from '../lib/connector.svelte';
   import { game } from '../lib/game.svelte';
@@ -19,10 +20,26 @@
   let downloadProgress = $state<{ status: string; percent: number | null } | null>(null);
   let downloadError = $state<string | null>(null);
 
+  // Свежая проверка при каждом открытии экрана — кэш из ensureOllamaRunning
+  // (один раз при входе в игру) мог устареть или быть неверным.
+  $effect(() => {
+    if (game.screen !== 'settings') return;
+    void refreshModelAvailability();
+  });
+
   async function testConnection() {
     connChecking = true;
     connOk = await checkConnection();
+    void refreshModelAvailability();
     connChecking = false;
+  }
+
+  /** Проверяем ещё раз прямо перед диалогом — модель могла появиться уже после
+   *  открытия экрана (например, sidecar только что доставил её). */
+  async function onDownloadClick() {
+    if (downloading) return;
+    const available = await refreshModelAvailability();
+    if (available !== true) pendingDownload = true;
   }
 
   async function confirmDownload() {
@@ -115,7 +132,7 @@
   </p>
   {#if ollamaAutoStatus.modelAvailable === false || downloading}
     <p>
-      <button onclick={() => (pendingDownload = true)} disabled={downloading}>
+      <button onclick={() => void onDownloadClick()} disabled={downloading}>
         {t('СКАЧАТЬ МОДЕЛЬ')}
       </button>
       {#if downloading}

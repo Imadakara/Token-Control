@@ -6,6 +6,7 @@
     buildFleetContext,
     ollamaAutoStatus,
     pullModel,
+    refreshModelAvailability,
     resolveToolCall,
   } from '../lib/assistant.svelte';
   import { api } from '../lib/api';
@@ -40,6 +41,13 @@
   $effect(() => {
     void messages.length;
     if (messagesEl) messagesEl.scrollTop = messagesEl.scrollHeight;
+  });
+
+  // Свежая проверка при каждом открытии экрана — кэш из ensureOllamaRunning
+  // (один раз при входе в игру) мог устареть или быть неверным.
+  $effect(() => {
+    if (game.screen !== 'assistant') return;
+    void refreshModelAvailability();
   });
 
   function pushMsg(role: DisplayMessage['role'], text: string): void {
@@ -104,9 +112,12 @@
   async function send(): Promise<void> {
     const text = input.trim();
     if (!text || busy || !game.state || downloading) return;
-    if (ollamaAutoStatus.modelAvailable === false) {
-      pendingDownload = true;
-      return;
+    if (ollamaAutoStatus.modelAvailable !== true) {
+      const available = await refreshModelAvailability();
+      if (available !== true) {
+        pendingDownload = true;
+        return;
+      }
     }
     input = '';
     pushMsg('user', text);

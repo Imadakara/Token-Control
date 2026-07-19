@@ -8,10 +8,17 @@
 //! Модель НЕ входит в комплект и не скачивается этой командой — это большая
 //! (~2 ГБ) загрузка, которую инициирует только явный клик игрока
 //! (`assistant.svelte.ts::pullModel`).
+//!
+//! Sidecar намеренно НЕ переопределяет `OLLAMA_MODELS` — раньше он указывал
+//! на изолированную папку внутри `app_data_dir()`, из-за чего модель, уже
+//! скачанная игроком через отдельно установленный/вручную запущенный Ollama
+//! (стандартное место хранения), оказывалась «не видна» встроенному
+//! движку, и игра предлагала скачать её заново. Без переопределения sidecar
+//! использует то же стандартное место хранения моделей, что и любая другая
+//! копия Ollama на машине игрока — модели, скачанные один раз, видны отовсюду.
 
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
-use tauri::Manager;
 use tauri_plugin_shell::ShellExt;
 
 #[derive(Debug, Clone, Serialize)]
@@ -72,12 +79,7 @@ pub fn ollama_ensure_running(
         };
     }
 
-    let models_dir = app
-        .path()
-        .app_data_dir()
-        .map(|d| d.join("ollama-models"))
-        .ok();
-    let mut cmd = match app.shell().sidecar("ollama") {
+    let cmd = match app.shell().sidecar("ollama") {
         Ok(c) => c.args(["serve"]),
         Err(_) => {
             return OllamaStatus {
@@ -86,10 +88,6 @@ pub fn ollama_ensure_running(
             }
         }
     };
-    if let Some(dir) = &models_dir {
-        let _ = std::fs::create_dir_all(dir);
-        cmd = cmd.env("OLLAMA_MODELS", dir);
-    }
 
     // Процесс намеренно не отслеживается и не останавливается приложением —
     // фоновый сервис, живёт и после закрытия игры, как и обычный Ollama.
