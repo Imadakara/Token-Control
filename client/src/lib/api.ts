@@ -1,6 +1,7 @@
 import type {
   ActionParams,
   ActionType,
+  AssistantPrepareResponse,
   AuthResponse,
   ChainResponse,
   ConfigResponse,
@@ -106,6 +107,9 @@ export const api = {
   tech: () => request<TechResponse>('/tech'),
   techResearch: (techId: string) =>
     request<StateResponse>('/tech/research', { method: 'POST', body: JSON.stringify({ techId }) }),
+  /** ИИ-ассистент (ТЗ v0.02 п. 7): списывает assistantCostOvm за каждый вызов. */
+  assistantPrepare: () =>
+    request<AssistantPrepareResponse>('/assistant/prepare', { method: 'POST', body: '{}' }),
   /** Цепь Миров (ТЗ v0.02 п. 4). */
   chain: () => request<ChainResponse>('/chain'),
   chainConnect: (keyId: string) =>

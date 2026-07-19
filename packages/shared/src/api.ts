@@ -136,6 +136,17 @@ export interface ChainConnectRequest {
   keyId: string;
 }
 
+// ---- Ассистент (ТЗ v0.02 п. 7) ----
+
+/** Списывает assistantCostOvm и выдаёт то, что ассистенту разрешено знать. */
+export interface AssistantPrepareResponse {
+  systemPrompt: string;
+  /** Только реально открытые игроком записи — то же самое, что GET /knowledge. */
+  entries: KnowledgeEntry[];
+  /** Буфер ОВМ после списания — клиент показывает его без лишнего /state. */
+  ovmBuffer: number;
+}
+
 // ---- Journal ----
 
 export interface LogEntry {

@@ -114,6 +114,28 @@ const EN: Record<string, string> = {
   'НЕТ МОДУЛЯ ВООРУЖЕНИЯ': 'NO WEAPON MODULE',
   'НУЖНА ТОЧКА': 'POINT REQUIRED',
 
+  // Причины недоступности приказов (game/actions.ts, game/orders.ts)
+  'НЕ УКАЗАН СЕКТОР': 'SECTOR NOT SPECIFIED',
+  'НЕ УКАЗАНА ЦЕЛЬ': 'TARGET NOT SPECIFIED',
+  'НЕТ ДОБЫВАЕМЫХ ОБЪЕКТОВ РЯДОМ': 'NO MINEABLE OBJECTS NEARBY',
+  'НЕТ ИЗВЕСТНЫХ ОБЪЕКТОВ РЯДОМ': 'NO KNOWN OBJECTS NEARBY',
+  'НЕТ ПОДБИРАЕМЫХ ОБЪЕКТОВ РЯДОМ': 'NO PICKABLE OBJECTS NEARBY',
+  'НЕТ ЦЕЛЕЙ ДЛЯ АТАКИ РЯДОМ': 'NO ATTACK TARGETS NEARBY',
+  'НЕЧЕГО ПОДСТЫКОВАТЬ': 'NOTHING TO DOCK WITH',
+  'НУЖНА ТОЧКА ИЛИ ЦЕЛЬ': 'POINT OR TARGET REQUIRED',
+  'ОБЪЕКТ БЕЗ РЕСУРСА': 'OBJECT HAS NO RESOURCE',
+  'ОБЪЕКТ НЕ ПОДБИРАЕМ': 'OBJECT NOT PICKABLE',
+  'ОБЪЕКТ НЕ СУЩЕСТВУЕТ': 'OBJECT DOES NOT EXIST',
+  'ОЧЕРЕДЬ ЗАПОЛНЕНА': 'QUEUE FULL',
+  'РЕСУРС ИСЧЕРПАН': 'RESOURCE DEPLETED',
+  'СЕКТОР ВНЕ ГАЛАКТИКИ': 'SECTOR OUTSIDE GALAXY',
+  'СУЩНОСТЬ НЕ ВОЗЛЕ ОБЪЕКТА': 'ENTITY NOT NEAR OBJECT',
+  'СУЩНОСТЬ НЕПОДВИЖНА': 'ENTITY IMMOBILE',
+  'ТРЮМ ПЕРЕПОЛНЕН': 'CARGO HOLD FULL',
+  'ЦЕЛЬ НЕ В ТЕКУЩЕМ СЕКТОРЕ': 'TARGET NOT IN CURRENT SECTOR',
+  'ЦЕЛЬ НЕ СУЩЕСТВУЕТ': 'TARGET DOES NOT EXIST',
+  'ЦЕЛЬ НЕУЯЗВИМА': 'TARGET INVULNERABLE',
+
   // Карты
   'КАРТА СЕКТОРА': 'SECTOR MAP',
   '— РЕЖИМ ВЫБОРА ЦЕЛИ': '— TARGET SELECT MODE',
@@ -228,6 +250,7 @@ const EN: Record<string, string> = {
 
   // База Знаний и Технологии (ТЗ v0.02 пп. 5–6)
   'ЗАГРУЗКА ДАННЫХ': 'UPLOAD DATA',
+  'БАЗА ЗНАНИЙ': 'KNOWLEDGE BASE',
   'БАЗА ЗНАНИЙ И ТЕХНОЛОГИИ': 'KNOWLEDGE BASE & TECHNOLOGY',
   'ЗАПИСИ': 'ENTRIES',
   'ТЕХНОЛОГИИ': 'TECHNOLOGY',
@@ -263,6 +286,24 @@ const EN: Record<string, string> = {
   'ТРЕБУЕТСЯ ТЕХНОЛОГИЯ: ВООРУЖЕНИЕ': 'TECHNOLOGY REQUIRED: WEAPONS',
   '[↑↓] ВЫБОР [←→] СВЕРНУТЬ/РАЗВЕРНУТЬ [ENTER] ВЫБРАТЬ/ИЗУЧИТЬ':
     '[↑↓] SELECT [←→] COLLAPSE/EXPAND [ENTER] PICK/RESEARCH',
+
+  // Ассистент (ТЗ v0.02 п. 7)
+  'АССИСТЕНТ': 'ASSISTANT',
+  'АССИСТЕНТ:': 'ASSISTANT:',
+  'НАСТРОЙКИ — АССИСТЕНТ': 'SETTINGS — ASSISTANT',
+  'АДРЕС API:': 'API URL:',
+  'МОДЕЛЬ:': 'MODEL:',
+  'ПРОВЕРИТЬ': 'CHECK',
+  'ПРОВЕРКА...': 'CHECKING...',
+  'ПОДКЛЮЧЕНО': 'CONNECTED',
+  'НЕДОСТУПНО': 'UNAVAILABLE',
+  'СПРОСИТЕ ЧТО-НИБУДЬ ИЛИ ОТДАЙТЕ КОМАНДУ ФЛОТУ': 'ASK SOMETHING OR GIVE THE FLEET A COMMAND',
+  'АССИСТЕНТ ДУМАЕТ...': 'ASSISTANT IS THINKING...',
+  'АССИСТЕНТ НЕ ДАЛ ОТВЕТА': 'ASSISTANT GAVE NO ANSWER',
+  'АССИСТЕНТ НЕДОСТУПЕН:': 'ASSISTANT UNAVAILABLE:',
+  'СООБЩЕНИЕ...': 'MESSAGE...',
+  'ОТПРАВИТЬ': 'SEND',
+  'АССИСТЕНТ ХОЧЕТ:': 'ASSISTANT WANTS TO:',
 };
 
 class I18n {

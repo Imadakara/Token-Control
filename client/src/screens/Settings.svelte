@@ -1,10 +1,19 @@
 <script lang="ts">
   import { api } from '../lib/api';
+  import { assistantSettings, checkConnection } from '../lib/assistant.svelte';
   import { connector } from '../lib/connector.svelte';
   import { game } from '../lib/game.svelte';
   import { i18n, t } from '../lib/i18n.svelte';
 
   let debugBusy = $state(false);
+  let connChecking = $state(false);
+  let connOk = $state<boolean | null>(null);
+
+  async function testConnection() {
+    connChecking = true;
+    connOk = await checkConnection();
+    connChecking = false;
+  }
 
   async function debugCredit() {
     if (debugBusy) return;
@@ -51,6 +60,34 @@
   {:else}
     <pre class="dim">{t('КОННЕКТОР ДОСТУПЕН ТОЛЬКО В ДЕСКТОП-ОБОЛОЧКЕ (npm run tauri dev).')}</pre>
   {/if}
+</div>
+
+<div class="panel" style="margin-top:0.5rem">
+  <div class="panel-title">{t('НАСТРОЙКИ — АССИСТЕНТ')}</div>
+  <p>
+    {t('АДРЕС API:')}
+    <input
+      value={assistantSettings.baseUrl}
+      oninput={(e) => assistantSettings.setBaseUrl(e.currentTarget.value)}
+    />
+  </p>
+  <p>
+    {t('МОДЕЛЬ:')}
+    <input
+      value={assistantSettings.model}
+      oninput={(e) => assistantSettings.setModel(e.currentTarget.value)}
+    />
+  </p>
+  <p>
+    <button onclick={testConnection} disabled={connChecking}>{t('ПРОВЕРИТЬ')}</button>
+    {#if connChecking}
+      <span class="dim">{t('ПРОВЕРКА...')}</span>
+    {:else if connOk === true}
+      <span class="accent">{t('ПОДКЛЮЧЕНО')}</span>
+    {:else if connOk === false}
+      <span class="err">{t('НЕДОСТУПНО')}</span>
+    {/if}
+  </p>
 </div>
 
 <div class="panel" style="margin-top:0.5rem">

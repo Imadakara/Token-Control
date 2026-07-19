@@ -3,6 +3,7 @@ import jwt from '@fastify/jwt';
 import websocket from '@fastify/websocket';
 import { createDb, DATABASE_URL, type Db } from './db/client';
 import { loadServerConfig, type ServerConfig } from './game/config';
+import { assistantRoutes } from './routes/assistant';
 import { authRoutes } from './routes/auth';
 import { chainRoutes } from './routes/chain';
 import { creditsRoutes } from './routes/credits';
@@ -78,6 +79,7 @@ export async function buildApp(opts: BuildAppOptions = {}): Promise<FastifyInsta
   await app.register(debugRoutes);
   await app.register(knowledgeRoutes);
   await app.register(chainRoutes);
+  await app.register(assistantRoutes);
 
   return app;
 }

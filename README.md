@@ -1,11 +1,12 @@
 # Token Control
 
-Игровое приложение-компаньон «терминал звездолёта»: очки вычислительной мощности (ОВМ) начисляются за реальный расход токенов Claude Code на вашей машине. Сервер авторитетен по игровому состоянию; клиент — ретро-терминал (Tauri + Svelte) со встроенным Rust-коннектором.
+Игровое приложение-компаньон: очки вычислительной мощности (ОВМ) начисляются за реальный расход токенов Claude Code на вашей машине и управляют флотилией сущностей в пошаговой стратегии. Сервер авторитетен по игровому состоянию; клиент — ретро-терминал (Tauri + Svelte) со встроенным Rust-коннектором.
 
-- ТЗ: `Personal Vault/Token Control Docs/ТЗ - MVP - Token Control v0.01.md`
-- План разработки и статус фаз: [docs/PLAN.md](docs/PLAN.md)
-- Документация реализации фаз 1–5: [docs/IMPLEMENTATION.md](docs/IMPLEMENTATION.md)
-- План развития до стратегии (ТЗ v0.02, фазы 6–13): [docs/Strategy - Plan.md](docs/Strategy%20-%20Plan.md)
+- ТЗ MVP: `Personal Vault/Token Control Docs/ТЗ - MVP - Token Control v0.01.md`
+- ТЗ стратегии: `Personal Vault/Token Control Docs/ТЗ - MVP - Token Control v0.02.md`
+- План MVP (фазы 0–5): [docs/MVP - Plan.md](docs/MVP%20-%20Plan.md)
+- План стратегии (фазы 6–13, ТЗ v0.02): [docs/Strategy - Plan.md](docs/Strategy%20-%20Plan.md)
+- Документация реализации (фазы 1–13, как всё устроено): [docs/MVP - Implementation.md](docs/MVP%20-%20Implementation.md)
 
 ## Как запустить
 
@@ -46,13 +47,26 @@ cd client/src-tauri && cargo run --bin connector_cli -- misha
 
 ### Прочее
 
+- Экраны — цифры `1`–`9` и `0` (Приказы, Флотилия, Сектор, Галактика, Трюм,
+  Статус, Журнал, Настройки, База Знаний, Ассистент), либо `Tab`/`Shift+Tab`
+  по кругу.
+- Ассистент (опционально, ТЗ v0.02 п. 7): чат отвечает на вопросы по Базе
+  Знаний и может отдавать приказы флоту естественным языком — списывает ОВМ
+  из общего буфера. Нужен локально поднятый [Ollama](https://ollama.com) с
+  моделью, поддерживающей tool-calling (по умолчанию клиент ждёт `qwen2.5:3b`
+  на `http://127.0.0.1:11434/v1` — `ollama pull qwen2.5:3b`); адрес и модель
+  меняются в Настройках, там же кнопка «Проверить» связь. Без поднятого
+  Ollama экран честно сообщает об этом — остальная игра не зависит от этой фазы.
 - Дебаг-режим: войдите с позывным `DEBUG` — в Настройках появится панель
   отладки (например, `[B] +1000 ОВМ в буфер`). Работает только для этого
   позывного, сервер остальных не пустит.
 - Тесты: `npm test` (сервер, нужен Docker) и `cd client/src-tauri && cargo test` (коннектор).
 - Сервер читает порт из `GAME_SERVER_PORT` (не `PORT`), БД — из `DATABASE_URL`.
 - Игровой баланс (стоимости, формула ОВМ, лимиты, генерация) лежит в таблице `game_config` и перечитывается раз в 60 с — правится без рестарта и без релиза клиента (ТЗ п. 12.2).
-- Сброс мира: `docker compose down -v` (потом обычный запуск).
+- Сброс мира без потери истории начислений: `npx tsx server/scripts/wipe.ts --yes`
+  (очищает флот/сектора/знания/Цепь Миров, сохраняет `credit_ledger` и
+  `game_config`). Полный сброс вместе с балансом и историей начислений:
+  `docker compose down -v` (потом обычный запуск).
 
 ## Схема файлов
 
@@ -61,11 +75,16 @@ Token Control/
 ├─ package.json               # корень npm workspaces: dev/build/test всех пакетов
 ├─ tsconfig.base.json         # общий строгий tsconfig
 ├─ docker-compose.yml         # PostgreSQL 16 для разработки (порт 5544)
-├─ docs/PLAN.md               # поэтапный план MVP и ключевые решения
+├─ docs/
+│  ├─ MVP - Plan.md           # поэтапный план MVP (фазы 0–5, ТЗ v0.01)
+│  ├─ MVP - Implementation.md # как реализованы фазы 1–13 (обе части ТЗ)
+│  └─ Strategy - Plan.md      # план стратегии (фазы 6–13, ТЗ v0.02) и решения
 │
 ├─ packages/shared/           # @tokencontrol/shared — единый источник типов
 │  └─ src/
-│     ├─ domain.ts            # ActionType, объекты сектора, слоты очереди, параметры действий
+│     ├─ domain.ts            # ActionType, EntityState, QueueTask, параметры приказов
+│     ├─ entities.ts          # каталог классов сущностей и модулей (ENTITY_CLASSES, MODULES)
+│     ├─ knowledge.ts         # каталог Базы Знаний/Технологий + системный промпт ассистента
 │     ├─ config.ts            # форма GameConfig (стоимости, формула, лимиты) + дефолты
 │     ├─ api.ts               # DTO всех эндпоинтов и WS-сообщений (импортируют сервер и клиент)
 │     └─ index.ts             # реэкспорт
@@ -73,67 +92,84 @@ Token Control/
 ├─ server/                    # игровой сервер: Fastify + Drizzle + PostgreSQL
 │  ├─ drizzle.config.ts       # конфиг drizzle-kit (генерация миграций)
 │  ├─ vitest.config.ts        # тесты последовательно (общая тестовая БД)
-│  ├─ scripts/feed.ts         # фейковый коннектор: качает синтетические ОВМ
-│  ├─ test/                   # vitest: worldgen, API, движок очереди/начислений
+│  ├─ scripts/
+│  │  ├─ feed.ts              # фейковый коннектор: качает синтетические ОВМ
+│  │  └─ wipe.ts              # сброс мира без потери credit_ledger/game_config
+│  ├─ test/                   # vitest: worldgen, API, флот, приказы, знания, Цепь Миров,
+│  │                          #   ассистент, нагрузка, переживание рестартов
 │  └─ src/
-│     ├─ index.ts             # bootstrap: миграции, регенерация, hot-reload конфига, listen
+│     ├─ index.ts             # bootstrap: миграции, регенерация, свип, hot-reload конфига, listen
 │     ├─ app.ts               # сборка Fastify-приложения (JWT, WS, маршруты) — используется тестами
 │     ├─ ws.ts                # реестр WS-подключений по игрокам, push/broadcast
 │     ├─ db/
-│     │  ├─ schema.ts         # все 10 таблиц (players, ships, queues, cargo, sectors,
-│     │  │                    #   objects, known_objects, visited_sectors, action_log,
-│     │  │                    #   credit_ledger, game_config)
+│     │  ├─ schema.ts         # entities/queues (по сущностям), cargo, sectors, objects,
+│     │  │                    #   known_objects, visited_sectors, action_log, credit_ledger,
+│     │  │                    #   game_config, player_knowledge, player_tech, sector_links,
+│     │  │                    #   chain_keys
 │     │  ├─ client.ts         # подключение postgres.js + drizzle
 │     │  ├─ migrate.ts        # применение миграций (старт сервера и тесты)
 │     │  └─ migrations/       # сгенерированный SQL (drizzle-kit generate)
 │     ├─ game/                # игровая логика (вся — внутри транзакций)
 │     │  ├─ rng.ts            # детерминированный PRNG (xmur3 + mulberry32)
-│     │  ├─ worldgen.ts       # генерация содержимого сектора по сиду, соседство секторов
+│     │  ├─ worldgen.ts       # генерация содержимого сектора по сиду, галактика 32×32
 │     │  ├─ world.ts          # ленивая генерация при первом визите, пометка «посещён»
 │     │  ├─ config.ts         # загрузка game_config из БД с дефолтами
-│     │  ├─ state.ts          # снапшот StateResponse (переиспользуют все маршруты)
-│     │  ├─ actions.ts        # 7 действий: валидация (enqueue/activate) + исполнение
-│     │  ├─ queue.ts          # движок очереди: слоты, буфер ОВМ, каскад излишка, НЕВЫПОЛНИМО
+│     │  ├─ state.ts          # снапшот StateResponse по флоту (переиспользуют все маршруты)
+│     │  ├─ entities.ts       # флот: создание, классы/модули, гейты возможностей
+│     │  ├─ actions.ts        # приказы: валидация (enqueue/activate) + исполнение
+│     │  ├─ orders.ts         # /orders/available — доступность приказов и кандидаты целей
+│     │  ├─ queue.ts          # каскад ОВМ по флоту: слоты, буфер, НЕВЫПОЛНИМО
+│     │  ├─ sweep.ts          # тик довершения задач, набравших стоимость, после кулдауна
 │     │  ├─ credits.ts        # идемпотентный приём пакетов ОВМ + лимиты анти-абуза
+│     │  ├─ knowledge.ts      # прогресс Базы Знаний и Технологий
+│     │  ├─ chain.ts          # Цепь Миров: врата, рёбра, ключи, достижимость (BFS)
+│     │  ├─ assistant.ts      # контекст и списание ОВМ для ИИ-ассистента
 │     │  └─ regen.ts          # восстановление запасов астероидов по таймеру
 │     └─ routes/              # тонкие HTTP-обработчики поверх game/
-│        ├─ auth.ts           # POST /auth/dev (Steam — фаза 6), создание игрока и корабля
+│        ├─ auth.ts           # POST /auth/dev (Steam — фаза 99), создание игрока и домашнего сектора
 │        ├─ state.ts          # GET /state
-│        ├─ map.ts            # GET /map/sector (только открытое), GET /map/galaxy
-│        ├─ queue.ts          # queue/add|remove|reorder, ship/undock
+│        ├─ map.ts            # GET /map/sector (только открытое), GET /map/galaxy (+ Цепь Миров)
+│        ├─ orders.ts         # orders/available|add|remove|reorder, fleet/priority|rename
+│        ├─ knowledge.ts      # /knowledge, /tech, /tech/research
+│        ├─ chain.ts          # /chain, /chain/connect
+│        ├─ assistant.ts      # POST /assistant/prepare
 │        ├─ credits.ts        # POST /credits/submit (от коннектора)
-│        └─ log.ts            # GET /log — журнал с курсором
+│        ├─ log.ts            # GET /log — журнал с курсором
+│        └─ debug.ts          # только dev:DEBUG — кредит/спавн/ключи Цепи Миров
 │
 └─ client/                    # Tauri-приложение
    ├─ vite.config.ts          # dev-прокси /api и /ws → сервер :8787
    ├─ index.html              # точка входа веб-части
    ├─ src/                    # веб-UI: Svelte 5 (runes)
    │  ├─ main.ts, app.css     # монтирование и терминальная тема (палитра, панели)
-   │  ├─ App.svelte           # оболочка: шапка-телеметрия, меню 1-7, экраны, строка сообщений
+   │  ├─ App.svelte           # оболочка: шапка-телеметрия, меню, экраны, строка сообщений
    │  ├─ Login.svelte         # dev-вход по позывному
    │  ├─ lib/
+   │  │  ├─ screens.ts        # единый реестр экранов (меню + хоткеи + компонент)
    │  │  ├─ api.ts            # типизированный HTTP-клиент + WS с реконнектом
-   │  │  ├─ game.svelte.ts    # реактивное состояние игры, постановка действий, polling
+   │  │  ├─ game.svelte.ts    # реактивное состояние флота, постановка приказов, polling
+   │  │  ├─ assistant.svelte.ts # ассистент: транспорт до Ollama, tool-схема, резолв команд
    │  │  ├─ connector.svelte.ts # мост к Rust-коннектору (Tauri invoke/events, фолбэк в браузере)
    │  │  ├─ i18n.svelte.ts    # локализация RU/EN (русские строки — ключи словаря)
-   │  │  └─ terminal/
-   │  │     ├─ format.ts      # ASCII-прогресс-бары, форматирование ОВМ
-   │  │     ├─ keys.ts        # нормализация имён клавиш
-   │  │     └─ Crt.svelte     # отключаемый CRT-слой (сканлайны + виньетка)
-   │  └─ screens/             # 7 экранов ТЗ п. 4.2
-   │     ├─ Queue.svelte      # очередь: слоты, добавление, удаление с подтверждением
+   │  │  └─ terminal/         # общие компоненты: Overlay, Confirm, ListPicker, Tree, keys, format
+   │  └─ screens/             # 10 экранов (ТЗ v0.02 пп. 2–7), хоткеи 1–9 и 0
+   │     ├─ Orders.svelte     # приказы по флоту: дерево «сущность → слоты → доступно/недоступно»
+   │     ├─ Fleet.svelte      # список сущностей, приоритет ОВМ, переименование
    │     ├─ SectorMap.svelte  # ASCII-карта сектора, курсор, выбор цели/точки
-   │     ├─ GalaxyMap.svelte  # сетка галактики, выбор цели гиперпрыжка
-   │     ├─ Cargo.svelte      # трюм и вместимость
-   │     ├─ Status.svelte     # корабль, накопитель ОВМ, статус коннектора
+   │     ├─ GalaxyMap.svelte  # сетка галактики, Цепь Миров, ключи, выбор цели гиперпрыжка
+   │     ├─ Cargo.svelte      # трюм и вместимость сущности
+   │     ├─ Status.svelte     # накопитель ОВМ, статус коннектора
    │     ├─ Journal.svelte    # журнал операций
-   │     └─ Settings.svelte   # CRT, язык, коннектор, аккаунт
+   │     ├─ Settings.svelte   # CRT, язык, коннектор, ассистент, аккаунт, отладка
+   │     ├─ Knowledge.svelte  # База Знаний и Технологии
+   │     └─ Assistant.svelte  # чат с ИИ-ассистентом, подтверждение команд флоту
    └─ src-tauri/              # Rust-часть
       ├─ tauri.conf.json      # окно, сборка, идентификатор приложения
-      ├─ Cargo.toml
+      ├─ capabilities/default.json # разрешения: core, http (localhost — для ассистента)
+      ├─ Cargo.toml           # tauri, tauri-plugin-http, tauri-plugin-log, rusqlite, reqwest
       └─ src/
          ├─ main.rs           # точка входа десктоп-приложения
-         ├─ lib.rs            # Tauri: команды connector_start/stop, события, трей, скрытие в трей
+         ├─ lib.rs            # Tauri: плагины, команды connector_start/stop, трей
          ├─ bin/connector_cli.rs # коннектор без окна — для отладки
          └─ connector/        # коннектор Claude Code (ТЗ п. 7)
             ├─ mod.rs         # цикл: рескан 10с → дедуп → ОВМ → outbox → отправка 30с; baseline
@@ -144,4 +180,13 @@ Token Control/
 
 ## Что дальше
 
-Фаза 6 (Steam): авторизация auth ticket вместо dev-заглушки, сборки/депо, страница, privacy policy — см. [docs/PLAN.md](docs/PLAN.md).
+Фазы 0–13 завершены (MVP + стратегия ТЗ v0.02, включая опциональный
+Ассистент) — см. [docs/MVP - Implementation.md](docs/MVP%20-%20Implementation.md).
+Дальше по `docs/Strategy - Plan.md`:
+
+- Фазы 14–98 — зарезервированы под roadmap ТЗ v0.02 (производство
+  звездолётов и дронов, постройки в секторе, торговля между игроками, разные
+  версии терминалов на старте). Не начаты, содержание не детализировано.
+- Фаза 99 — Steam: авторизация auth ticket вместо dev-заглушки, реальный
+  биллинг ключей Цепи Миров через Steam Inventory поверх уже готовой
+  механики `chain_keys`, сборки/депо, страница, privacy policy. Не начата.

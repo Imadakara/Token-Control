@@ -4,6 +4,7 @@ import SectorMap from '../screens/SectorMap.svelte';
 import GalaxyMap from '../screens/GalaxyMap.svelte';
 import Cargo from '../screens/Cargo.svelte';
 import Knowledge from '../screens/Knowledge.svelte';
+import Assistant from '../screens/Assistant.svelte';
 import Status from '../screens/Status.svelte';
 import Journal from '../screens/Journal.svelte';
 import Settings from '../screens/Settings.svelte';
@@ -26,6 +27,7 @@ export const SCREENS = [
   { id: 'journal', key: '7', label: 'ЖУРНАЛ', component: Journal },
   { id: 'settings', key: '8', label: 'НАСТРОЙКИ', component: Settings },
   { id: 'knowledge', key: '9', label: 'БАЗА ЗНАНИЙ', component: Knowledge },
+  { id: 'assistant', key: '0', label: 'АССИСТЕНТ', component: Assistant },
 ] as const;
 
 export type Screen = (typeof SCREENS)[number]['id'];

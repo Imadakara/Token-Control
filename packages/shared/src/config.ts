@@ -16,6 +16,8 @@ export interface GameConfig {
   };
   /** Кап системного буфера ОВМ (ТЗ п. 5). */
   ovmBufferCap: number;
+  /** Стоимость одного запроса к ассистенту в ОВМ (ТЗ v0.02 п. 7). */
+  assistantCostOvm: number;
   /** Лимиты анти-абуза (ТЗ п. 9). */
   limits: {
     maxOvmPerMinute: number;
@@ -58,6 +60,7 @@ export const DEFAULT_GAME_CONFIG: GameConfig = {
   },
   conversion: { kCacheW: 1, kCacheR: 0.1, n: 1000 },
   ovmBufferCap: 100_000,
+  assistantCostOvm: 300,
   limits: {
     maxOvmPerMinute: 500,
     maxOvmPerHour: 10_000,
