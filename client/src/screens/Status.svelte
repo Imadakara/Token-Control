@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { api } from '../lib/api';
   import { connector } from '../lib/connector.svelte';
   import { game } from '../lib/game.svelte';
   import { t } from '../lib/i18n.svelte';
@@ -8,19 +7,19 @@
   /** Выбранная во «Флотилии» сущность, иначе — ведущая. */
   const ship = $derived(game.selectedEntity);
 
-  async function undock() {
+  /**
+   * Расстыковка объединена со стыковкой в приказ `interact` (ТЗ v0.02 п. 3.2):
+   * сервер сам решает направление по dockedObjectId. Больше не бесплатна и не
+   * мгновенна — уходит в очередь, как любой другой приказ.
+   */
+  function undock() {
     if (!ship) return;
-    try {
-      game.state = await api.undock(ship.id);
-      game.say('РАССТЫКОВКА ВЫПОЛНЕНА');
-    } catch (err) {
-      game.say(`${t('ОТКАЗ:')} ${(err as Error).message}`);
-    }
+    void game.chooseAction('interact', [ship.id]);
   }
 
   function onKey(e: KeyboardEvent) {
     if (game.screen !== 'status' || game.keysCaptured) return;
-    if (e.key.toLowerCase() === 'u' && ship?.dockedObjectId) void undock();
+    if (e.key.toLowerCase() === 'u' && ship?.dockedObjectId) undock();
   }
 
   const L = (label: string, width = 22) => label.padEnd(width, '.').replace(/\.$/, '. ');

@@ -13,7 +13,7 @@ export type ModuleId = (typeof MODULE_IDS)[number];
 export interface ModuleDef {
   id: ModuleId;
   title: string;
-  /** Приказы, которые модуль открывает своей сущности (проверка — фаза 9). */
+  /** Приказы, которые модуль открывает своей сущности (game/actions.ts, game/orders.ts). */
   grants: ActionType[];
   /** Урон за исполнение приказа «Атака»; null — модуль невоенный. */
   damage: number | null;
@@ -49,7 +49,7 @@ export const ENTITY_CLASSES: Record<EntityClassId, EntityClassDef> = {
     mobile: true,
     cargoCapacity: 100,
     hpMax: 10,
-    baseModules: ['mining_laser', 'survey_array'],
+    baseModules: ['mining_laser', 'survey_array', 'railgun'],
     namePrefix: 'БОРТ',
   },
   hauler_mk1: {

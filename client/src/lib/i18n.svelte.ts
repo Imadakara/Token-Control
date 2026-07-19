@@ -98,14 +98,19 @@ const EN: Record<string, string> = {
   '[ENTER/Y] ДА [ESC/N] НЕТ': '[ENTER/Y] YES [ESC/N] NO',
   'ОВМ': 'CPP',
 
-  // Действия
+  // Действия (ТЗ v0.02 п. 3.2: базовый перечень приказов)
   'СКАНИРОВАНИЕ': 'SCAN',
   'ПРЫЖОК В СЕКТОРЕ': 'LOCAL JUMP',
   'ГИПЕРПРЫЖОК': 'HYPERJUMP',
   'СТЫКОВКА': 'DOCKING',
+  'ВЗАИМОДЕЙСТВИЕ': 'INTERACT',
   'АНАЛИЗ ОБЪЕКТА': 'ANALYZE OBJECT',
   'ДОБЫЧА РЕСУРСА': 'MINE RESOURCE',
   'ПОДБОР ОБЪЕКТА': 'PICK UP OBJECT',
+  'АТАКА': 'ATTACK',
+  'СПЕЦИАЛЬНОЕ ДЕЙСТВИЕ': 'SPECIAL ACTION',
+  'НЕТ МОДУЛЯ': 'NO MODULE',
+  'НЕТ МОДУЛЯ ВООРУЖЕНИЯ': 'NO WEAPON MODULE',
 
   // Карты
   'КАРТА СЕКТОРА': 'SECTOR MAP',

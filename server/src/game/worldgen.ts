@@ -93,7 +93,9 @@ export function generateSector(sectorId: string, world: WorldGenParams): Generat
       type: 'asteroid',
       x: coord(),
       y: coord(),
-      props: { ore },
+      // Атакуемы (ТЗ v0.02 п. 3.2): альтернатива добыче — уничтожить целиком
+      // и подобрать контейнер, а не выбирать ресурс по единице через mine.
+      props: { ore, attackable: true, hp: rng.int(10, 30) },
       resourceType: ore,
       resourceAmount: max,
       maxResource: max,
@@ -119,7 +121,9 @@ export function generateSector(sectorId: string, world: WorldGenParams): Generat
       type: 'phenomenon',
       x: coord(),
       y: coord(),
-      props: { class: rng.pick(['nebula', 'anomaly', 'pulsar-echo']) },
+      // До фазы 9 феномены были инертной декорацией — теперь их можно
+      // уничтожить ради контейнера, первый игровой смысл для этого типа.
+      props: { class: rng.pick(['nebula', 'anomaly', 'pulsar-echo']), attackable: true, hp: rng.int(5, 15) },
       resourceType: null,
       resourceAmount: null,
       maxResource: null,

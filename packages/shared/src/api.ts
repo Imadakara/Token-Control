@@ -57,10 +57,6 @@ export interface FleetRenameRequest {
   entityId: string;
   name: string;
 }
-/** Расстыковка — мгновенна и бесплатна (ТЗ п. 6.4), не приказ очереди. */
-export interface ShipUndockRequest {
-  entityId: string;
-}
 
 // ---- Credits (коннектор → сервер, ТЗ п. 7.4) ----
 

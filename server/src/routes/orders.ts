@@ -7,12 +7,11 @@ import type {
   OrdersAvailableResponse,
   OrdersRemoveRequest,
   OrdersReorderRequest,
-  ShipUndockRequest,
 } from '@tokencontrol/shared';
 import { ACTION_TYPES } from '@tokencontrol/shared';
 import { and, eq } from 'drizzle-orm';
 import { entities } from '../db/schema';
-import { getOwnedEntity, leadEntity, listEntities } from '../game/entities';
+import { getOwnedEntity, listEntities } from '../game/entities';
 import { listOrders } from '../game/orders';
 import { addTask, QueueError, removeTask, reorderTasks, type QueueEvent } from '../game/queue';
 import { respondWithState } from './state-push';
@@ -180,25 +179,6 @@ export async function orderRoutes(app: FastifyInstance) {
       const entity = await getOwnedEntity(app.db, pid, entityId);
       if (!entity) return reply.code(404).send({ error: 'СУЩНОСТЬ НЕ НАЙДЕНА' });
       await app.db.update(entities).set({ name: trimmed }).where(eq(entities.id, entity.id));
-      return respondWithState(app, pid);
-    },
-  );
-
-  /**
-   * Расстыковка — мгновенно и без стоимости (ТЗ п. 6.4), не приказ очереди.
-   * Полноценное «Взаимодействие» (стыковка/расстыковка одним приказом
-   * `interact`) — фаза 9; пока это отдельная свободная команда, как в MVP.
-   */
-  app.post<{ Body: ShipUndockRequest }>(
-    '/ship/undock',
-    { preHandler: [app.authenticate] },
-    async (req, reply) => {
-      const pid = req.user.pid;
-      const entity = req.body?.entityId
-        ? await getOwnedEntity(app.db, pid, req.body.entityId)
-        : await leadEntity(app.db, pid);
-      if (!entity) return reply.code(404).send({ error: 'СУЩНОСТЬ НЕ НАЙДЕНА' });
-      await app.db.update(entities).set({ dockedObjectId: null }).where(eq(entities.id, entity.id));
       return respondWithState(app, pid);
     },
   );

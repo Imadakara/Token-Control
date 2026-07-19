@@ -94,8 +94,8 @@ describe('флот', () => {
     const firstId = state.entities[0]!.id;
 
     // Обеим — по прыжку (100 ОВМ каждый)
-    await t.order([firstId], 'jump_local', { kind: 'point', x: 100, y: 100 });
-    await t.order([secondId], 'jump_local', { kind: 'point', x: 200, y: 200 });
+    await t.order([firstId], 'move', { kind: 'point', x: 100, y: 100 });
+    await t.order([secondId], 'move', { kind: 'point', x: 200, y: 200 });
 
     await t.submit(60);
     state = await t.state();
@@ -123,8 +123,8 @@ describe('флот', () => {
     const res = await t.priority([secondId, firstId]);
     expect(res.statusCode).toBe(200);
 
-    await t.order([firstId], 'jump_local', { kind: 'point', x: 10, y: 10 });
-    await t.order([secondId], 'jump_local', { kind: 'point', x: 20, y: 20 });
+    await t.order([firstId], 'move', { kind: 'point', x: 10, y: 10 });
+    await t.order([secondId], 'move', { kind: 'point', x: 20, y: 20 });
     await t.submit(50);
 
     const state = await t.state();
@@ -149,7 +149,7 @@ describe('флот', () => {
       await t.order([firstId], 'scan');
       await t.submit(10);
 
-      await t.order([secondId], 'jump_local', { kind: 'point', x: 300, y: 300 });
+      await t.order([secondId], 'move', { kind: 'point', x: 300, y: 300 });
       await t.submit(80);
 
       const state = await t.state();
@@ -168,7 +168,7 @@ describe('флот', () => {
     const secondId = await spawn('dev:f5');
     const firstId = (await t.state()).entities[0]!.id;
 
-    const res = await t.order([firstId, secondId], 'jump_local', { kind: 'point', x: 500, y: 500 });
+    const res = await t.order([firstId, secondId], 'move', { kind: 'point', x: 500, y: 500 });
     expect(res.results).toEqual([
       { entityId: firstId, ok: true },
       { entityId: secondId, ok: true },
@@ -181,7 +181,7 @@ describe('флот', () => {
     const gateId = await spawn('dev:f6', 'gate'); // стационарный объект
     const firstId = (await t.state()).entities[0]!.id;
 
-    const res = await t.order([firstId, gateId], 'jump_local', { kind: 'point', x: 5, y: 5 });
+    const res = await t.order([firstId, gateId], 'move', { kind: 'point', x: 5, y: 5 });
     expect(res.results.find((r) => r.entityId === firstId)!.ok).toBe(true);
     const denied = res.results.find((r) => r.entityId === gateId)!;
     expect(denied.ok).toBe(false);
@@ -211,7 +211,7 @@ describe('флот', () => {
     ).json() as { objects: { id: string; type: string; x: number; y: number }[] };
     const asteroid = map.objects.find((o) => o.type === 'asteroid')!;
 
-    await t.order([minerId], 'jump_local', { kind: 'object', objectId: asteroid.id });
+    await t.order([minerId], 'move', { kind: 'object', objectId: asteroid.id });
     await t.submit(100);
     await t.order([minerId], 'mine', { kind: 'object', objectId: asteroid.id });
     await t.submit(100);

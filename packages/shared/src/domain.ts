@@ -1,14 +1,22 @@
 import type { EntityClassId, ModuleId } from './entities';
 
-/** Типы действий бортового компьютера (ТЗ п. 6). */
+/**
+ * Базовый перечень приказов (ТЗ v0.02 п. 3.2): Перемещение, Добыча, Атака,
+ * Взаимодействие, Специальное действие — плюс scan/analyze/pickup, унаследованные
+ * из MVP. `dock` объединён с расстыковкой в `interact` (сервер сам решает
+ * направление по текущему dockedObjectId — см. game/actions.ts), `jump_local`
+ * переименован в `move`, чтобы не путать с гиперпрыжком.
+ */
 export const ACTION_TYPES = [
   'scan',
-  'jump_local',
+  'move',
   'jump_hyper',
-  'dock',
+  'interact',
   'analyze',
   'mine',
   'pickup',
+  'attack',
+  'special',
 ] as const;
 export type ActionType = (typeof ACTION_TYPES)[number];
 
@@ -28,7 +36,7 @@ export interface QueueTask {
   /** Номер слота, 1..GameConfig.orderSlots; слот 1 — активный. */
   slot: number;
   action: ActionType;
-  /** Параметр действия: цель или точка (для scan/dock — отсутствует). */
+  /** Параметр действия: цель или точка (для scan/interact/special — отсутствует). */
   params: ActionParams | null;
   costOvm: number;
   progressOvm: number;

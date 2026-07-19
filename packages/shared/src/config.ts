@@ -43,12 +43,14 @@ export interface GameConfig {
 export const DEFAULT_GAME_CONFIG: GameConfig = {
   actionCosts: {
     scan: 10,
-    jump_local: 100,
+    move: 100,
     jump_hyper: 1000,
-    dock: 10,
+    interact: 10,
     analyze: 100,
     mine: 100,
     pickup: 10,
+    attack: 100,
+    special: 50,
   },
   conversion: { kCacheW: 1, kCacheR: 0.1, n: 1000 },
   ovmBufferCap: 100_000,

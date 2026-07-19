@@ -98,8 +98,6 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ entityId, name }),
     }),
-  undock: (entityId: string) =>
-    request<StateResponse>('/ship/undock', { method: 'POST', body: JSON.stringify({ entityId }) }),
   /** Дебаг-команда (сервер пускает только капитана DEBUG). */
   debugCredit: (ovm: number) =>
     request<StateResponse>('/debug/credit', { method: 'POST', body: JSON.stringify({ ovm }) }),

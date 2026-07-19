@@ -3,7 +3,7 @@ import { ACTION_TYPES } from '@tokencontrol/shared';
 import { and, eq } from 'drizzle-orm';
 import { knownObjects, objects, queues } from '../db/schema';
 import { validateAction, type ActionCtx } from './actions';
-import type { EntityRow } from './entities';
+import { hasModuleGranting, totalDamage, type EntityRow } from './entities';
 
 /**
  * Список приказов, доступных сущности прямо сейчас (ТЗ v0.02 п. 3.1): для
@@ -15,12 +15,14 @@ import type { EntityRow } from './entities';
 
 const TARGET_KIND: Record<ActionType, OrderTarget> = {
   scan: 'none',
-  dock: 'none',
-  jump_local: 'point',
+  interact: 'none',
+  move: 'point',
   jump_hyper: 'sector',
   analyze: 'object',
   mine: 'object',
   pickup: 'object',
+  attack: 'object',
+  special: 'none',
 };
 
 type ObjectRow = typeof objects.$inferSelect;
@@ -51,17 +53,37 @@ const OBJECT_PREDICATE: Partial<Record<ActionType, (obj: ObjectRow) => boolean>>
   analyze: () => true,
   mine: (obj) => !!obj.resourceType && (obj.resourceAmount ?? 0) > 0,
   pickup: (obj) => obj.type === 'container',
+  attack: (obj) => !!(obj.props as Record<string, unknown>).attackable,
 };
 
 const NO_CANDIDATES_REASON: Partial<Record<ActionType, string>> = {
   analyze: 'НЕТ ИЗВЕСТНЫХ ОБЪЕКТОВ РЯДОМ',
   mine: 'НЕТ ДОБЫВАЕМЫХ ОБЪЕКТОВ РЯДОМ',
   pickup: 'НЕТ ПОДБИРАЕМЫХ ОБЪЕКТОВ РЯДОМ',
+  attack: 'НЕТ ЦЕЛЕЙ ДЛЯ АТАКИ РЯДОМ',
 };
+
+/**
+ * Приказ требует модуля — проверяем это ДО поиска кандидатов, а не полагаемся
+ * на то, что validateAction его отловит: иначе сущность без бурового лазера,
+ * стоящая рядом с астероидом, получила бы «НЕТ РЕСУРСА РЯДОМ» вместо честного
+ * «НЕТ МОДУЛЯ» (ТЗ v0.02 п. 3.2, критерий фазы 9).
+ */
+function moduleGateReason(entity: EntityRow, action: ActionType): string | null {
+  if ((action === 'analyze' || action === 'mine' || action === 'special') && !hasModuleGranting(entity, action))
+    return 'НЕТ МОДУЛЯ';
+  if (action === 'attack' && totalDamage(entity) <= 0) return 'НЕТ МОДУЛЯ ВООРУЖЕНИЯ';
+  return null;
+}
 
 async function optionFor(ctx: ActionCtx, entity: EntityRow, action: ActionType): Promise<OrderOption> {
   const costOvm = ctx.cfg.game.actionCosts[action];
   const target = TARGET_KIND[action];
+
+  const gate = moduleGateReason(entity, action);
+  if (gate) {
+    return { action, costOvm, available: false, reason: gate, target, candidates: [] };
+  }
 
   if (target === 'object') {
     const predicate = OBJECT_PREDICATE[action]!;
@@ -96,7 +118,7 @@ async function optionFor(ctx: ActionCtx, entity: EntityRow, action: ActionType):
   }
 
   // none/point/sector: конкретной цели ещё нет — 'offer' проверяет только
-  // общие условия (класс, подвижность); dock/scan игнорируют params и в
+  // общие условия (класс, подвижность); interact/scan игнорируют params и в
   // 'activate'-ветке делают это независимо от режима.
   const v = await validateAction(ctx, entity, action, null, 'offer');
   return { action, costOvm, available: v.ok, reason: v.ok ? null : v.reason, target };

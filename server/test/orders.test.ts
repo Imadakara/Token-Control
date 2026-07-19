@@ -78,7 +78,7 @@ describe('доступные приказы', () => {
     const byAction = Object.fromEntries(entities[0]!.orders.map((o) => [o.action, o]));
 
     expect(byAction.scan).toMatchObject({ available: true, target: 'none' });
-    expect(byAction.jump_local).toMatchObject({ available: true, target: 'point' });
+    expect(byAction.move).toMatchObject({ available: true, target: 'point' });
     expect(byAction.jump_hyper).toMatchObject({ available: true, target: 'sector' });
     // Ничего не просканировано — целям неоткуда взяться
     expect(byAction.analyze).toMatchObject({ available: false, target: 'object', candidates: [] });
@@ -94,7 +94,7 @@ describe('доступные приказы', () => {
     await t.submit(10);
     const asteroid = (await t.sectorMap()).objects.find((o) => o.type === 'asteroid')!;
 
-    await t.order([id], 'jump_local', { kind: 'object', objectId: asteroid.id });
+    await t.order([id], 'move', { kind: 'object', objectId: asteroid.id });
     await t.submit(100);
 
     const { entities } = await t.available(id);
@@ -113,9 +113,9 @@ describe('доступные приказы', () => {
     const t = api(await authToken(app, 'o3'));
     const id = (await t.state()).entities[0]!.id;
     // orderSlots по умолчанию 3 — заполняем тремя прыжками
-    await t.order([id], 'jump_local', { kind: 'point', x: 1, y: 1 });
-    await t.order([id], 'jump_local', { kind: 'point', x: 2, y: 2 });
-    await t.order([id], 'jump_local', { kind: 'point', x: 3, y: 3 });
+    await t.order([id], 'move', { kind: 'point', x: 1, y: 1 });
+    await t.order([id], 'move', { kind: 'point', x: 2, y: 2 });
+    await t.order([id], 'move', { kind: 'point', x: 3, y: 3 });
 
     const { entities } = await t.available(id);
     expect(entities[0]!.orders.every((o) => !o.available)).toBe(true);
@@ -135,7 +135,7 @@ describe('доступные приказы', () => {
 
     const { entities } = await t.available(gate.id);
     const byAction = Object.fromEntries(entities[0]!.orders.map((o) => [o.action, o]));
-    expect(byAction.jump_local).toMatchObject({ available: false, reason: 'СУЩНОСТЬ НЕПОДВИЖНА' });
+    expect(byAction.move).toMatchObject({ available: false, reason: 'СУЩНОСТЬ НЕПОДВИЖНА' });
     expect(byAction.jump_hyper).toMatchObject({ available: false, reason: 'СУЩНОСТЬ НЕПОДВИЖНА' });
     expect(byAction.scan.available).toBe(true);
   });

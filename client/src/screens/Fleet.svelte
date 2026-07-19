@@ -1,5 +1,12 @@
 <script lang="ts">
-  import { ACTION_TYPES, ENTITY_CLASSES, MODULES, type ActionType, type EntityState } from '@tokencontrol/shared';
+  import {
+    ACTION_TYPES,
+    ENTITY_CLASSES,
+    MODULES,
+    type ActionType,
+    type EntityState,
+    type OrderOption,
+  } from '@tokencontrol/shared';
   import { api } from '../lib/api';
   import { ACTION_LABELS, entityStatusText, game } from '../lib/game.svelte';
   import { t } from '../lib/i18n.svelte';
@@ -12,6 +19,8 @@
   let cursor = $state(0);
   let hoverId = $state<string | null>(null);
   let ordering = $state(false);
+  /** Доступность приказов выбранной сущности — подгружается при открытии пикера. */
+  let pickerOrders = $state<Partial<Record<ActionType, OrderOption>> | null>(null);
   let renaming = $state(false);
   let renameValue = $state('');
   let renameInput = $state<HTMLInputElement | null>(null);
@@ -76,17 +85,29 @@
     queueMicrotask(() => renameInput?.select());
   }
 
+  /**
+   * Открывает пикер приказов и подгружает их доступность (ТЗ v0.02 п. 3.1) —
+   * без этого пикер предлагал бы, например, «ДОБЫЧУ» сущности без бурового
+   * модуля, а сервер отклонял бы её только при реальной постановке.
+   */
+  function openOrdering() {
+    if (!atCursor) return;
+    game.selectedEntityId = atCursor.id;
+    ordering = true;
+    pickerOrders = null;
+    void api.ordersAvailable(atCursor.id).then(({ entities }) => {
+      const orders = entities[0]?.orders ?? [];
+      pickerOrders = Object.fromEntries(orders.map((o) => [o.action, o]));
+    });
+  }
+
   function onKey(e: KeyboardEvent) {
     if (game.screen !== 'fleet' || game.keysCaptured) return;
     const k = keyOf(e);
     if (k === 'ArrowUp') select(Math.max(0, cursor - 1));
     else if (k === 'ArrowDown') select(Math.min(fleet.length - 1, cursor + 1));
-    else if (k === 'Enter') {
-      if (atCursor) {
-        game.selectedEntityId = atCursor.id;
-        ordering = true;
-      }
-    } else if (k === '+') void movePriority(1);
+    else if (k === 'Enter') openOrdering();
+    else if (k === '+') void movePriority(1);
     else if (k === '-') void movePriority(-1);
     else if (k.toLowerCase() === 'r') {
       startRename();
@@ -118,7 +139,7 @@
         onclick={() => select(i)}
         ondblclick={() => {
           select(i);
-          ordering = true;
+          openOrdering();
         }}
         onkeydown={() => {}}
         role="button"
@@ -197,9 +218,17 @@
       : `${t('ПРИКАЗ')}: ${atCursor.name}`}
     items={ACTION_TYPES}
     label={(a) => t(ACTION_LABELS[a])}
-    note={(a) => `(${game.config?.actionCosts[a] ?? '?'} ${t('ОВМ')})`}
+    note={(a) => {
+      const o = pickerOrders?.[a];
+      const cost = `(${game.config?.actionCosts[a] ?? '?'} ${t('ОВМ')})`;
+      return o && !o.available ? `${cost} — ${t(o.reason ?? '')}` : cost;
+    }}
+    disabled={(a) => !!pickerOrders && pickerOrders[a]?.available === false}
     onpick={(a) => issue(a, group.length > 1)}
-    oncancel={() => (ordering = false)}
+    oncancel={() => {
+      ordering = false;
+      pickerOrders = null;
+    }}
   />
 {/if}
 

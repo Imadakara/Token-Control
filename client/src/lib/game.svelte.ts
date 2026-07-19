@@ -23,12 +23,14 @@ export interface PickMode {
 
 export const ACTION_LABELS: Record<ActionType, string> = {
   scan: 'СКАНИРОВАНИЕ',
-  jump_local: 'ПРЫЖОК В СЕКТОРЕ',
+  move: 'ПРЫЖОК В СЕКТОРЕ',
   jump_hyper: 'ГИПЕРПРЫЖОК',
-  dock: 'СТЫКОВКА',
+  interact: 'ВЗАИМОДЕЙСТВИЕ',
   analyze: 'АНАЛИЗ ОБЪЕКТА',
   mine: 'ДОБЫЧА РЕСУРСА',
   pickup: 'ПОДБОР ОБЪЕКТА',
+  attack: 'АТАКА',
+  special: 'СПЕЦИАЛЬНОЕ ДЕЙСТВИЕ',
 };
 
 /** Статус сущности (ТЗ v0.02 п. 2); используется во «Флотилии», «Приказах» и на карте. */
@@ -248,10 +250,11 @@ class Game {
     }
     switch (action) {
       case 'scan':
-      case 'dock':
+      case 'interact':
+      case 'special':
         await this.enqueue(action, null, targets);
         break;
-      case 'jump_local':
+      case 'move':
         this.pick = { action, target: 'point', entityIds: targets };
         this.screen = 'sector';
         this.say('ВЫБЕРИТЕ ТОЧКУ ИЛИ ОБЪЕКТ [ENTER] — ОТМЕНА [ESC]');
@@ -259,6 +262,7 @@ class Game {
       case 'analyze':
       case 'mine':
       case 'pickup':
+      case 'attack':
         this.pick = { action, target: 'object', entityIds: targets };
         this.screen = 'sector';
         this.say('ВЫБЕРИТЕ ЦЕЛЬ [ENTER] — ОТМЕНА [ESC]');

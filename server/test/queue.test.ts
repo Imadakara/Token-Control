@@ -132,7 +132,7 @@ describe('очередь и начисления', () => {
     // Очередь из двух приказов: прыжок к объекту (100) + анализ (100).
     // Условие «возле» для анализа выполнит сам прыжок — валидация на
     // постановке статическая, позиционная проверка при активации.
-    await t.add(id, 'jump_local', { kind: 'object', objectId: asteroid.id });
+    await t.add(id, 'move', { kind: 'object', objectId: asteroid.id });
     const addAnalyze = await t.add(id, 'analyze', { kind: 'object', objectId: asteroid.id });
     expect(addAnalyze.statusCode).toBe(200);
 
@@ -168,11 +168,11 @@ describe('очередь и начисления', () => {
     const obj = map.objects[0]!;
 
     // Сущность в 0,0 — возле объекта? Прыгаем к объекту, ставим анализ + прыжок прочь + анализ
-    await t.add(id, 'jump_local', { kind: 'object', objectId: obj.id });
+    await t.add(id, 'move', { kind: 'object', objectId: obj.id });
     await t.submit(100);
 
     // Теперь возле: анализ валиден на постановке
-    await t.add(id, 'jump_local', { kind: 'point', x: 900, y: 900 }); // слот 1
+    await t.add(id, 'move', { kind: 'point', x: 900, y: 900 }); // слот 1
     await t.add(id, 'analyze', { kind: 'object', objectId: obj.id }); // слот 2: пока валиден
     const state = await t.state();
     expect(state.entities[0]!.orders).toHaveLength(2);
@@ -201,8 +201,8 @@ describe('очередь и начисления', () => {
 
     // Три приказа: слот1 активен, 2-3 переставляем
     await t.add(id, 'scan');
-    await t.add(id, 'jump_local', { kind: 'point', x: 1, y: 1 });
-    await t.add(id, 'jump_local', { kind: 'point', x: 2, y: 2 });
+    await t.add(id, 'move', { kind: 'point', x: 1, y: 1 });
+    await t.add(id, 'move', { kind: 'point', x: 2, y: 2 });
     await t.reorder(id, 2, 3);
     state = await t.state();
     const orders = state.entities[0]!.orders;
@@ -254,8 +254,8 @@ describe('очередь и начисления', () => {
     const t = api(await authToken(app, 'q10'));
     const id = (await t.state()).entities[0]!.id;
     await t.add(id, 'scan'); // 10, станет активной
-    await t.add(id, 'jump_local', { kind: 'point', x: 100, y: 100 }); // 100
-    await t.add(id, 'jump_local', { kind: 'point', x: 200, y: 200 }); // 100
+    await t.add(id, 'move', { kind: 'point', x: 100, y: 100 }); // 100
+    await t.add(id, 'move', { kind: 'point', x: 200, y: 200 }); // 100
     let state = await t.state();
     expect(state.entities[0]!.orders.map((q) => q.slot)).toEqual([1, 2, 3]);
 
@@ -263,7 +263,7 @@ describe('очередь и начисления', () => {
     state = await t.state();
     let orders = state.entities[0]!.orders;
     expect(orders).toHaveLength(2);
-    expect(orders[0]).toMatchObject({ slot: 1, action: 'jump_local', status: 'active' });
+    expect(orders[0]).toMatchObject({ slot: 1, action: 'move', status: 'active' });
     expect(orders[0]!.progressOvm).toBe(50);
     expect((orders[0]!.params as { x: number }).x).toBe(100);
     expect(orders[1]).toMatchObject({ slot: 2, status: 'waiting' });
@@ -282,7 +282,7 @@ describe('очередь и начисления', () => {
     await t.submit(10);
     const map = await t.sectorMap();
     const asteroid = map.objects.find((o) => o.type === 'asteroid')!;
-    await t.add(id, 'jump_local', { kind: 'object', objectId: asteroid.id });
+    await t.add(id, 'move', { kind: 'object', objectId: asteroid.id });
     await t.submit(100);
 
     await t.add(id, 'mine', { kind: 'object', objectId: asteroid.id }); // активна, валидна

@@ -73,7 +73,7 @@
       collapsedByDefault: true,
       children: unavailable.map((o) => ({
         id: `${entity.id}:unavail:${o.action}`,
-        label: `${t(ACTION_LABELS[o.action])} — ${o.reason ?? ''}`,
+        label: `${t(ACTION_LABELS[o.action])} — ${o.reason ? t(o.reason) : ''}`,
         dim: true,
       })),
     };

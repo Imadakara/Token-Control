@@ -1,5 +1,5 @@
-import type { EntityClassDef, EntityClassId, ModuleId } from '@tokencontrol/shared';
-import { ENTITY_CLASSES } from '@tokencontrol/shared';
+import type { ActionType, EntityClassDef, EntityClassId, ModuleId } from '@tokencontrol/shared';
+import { ENTITY_CLASSES, MODULES } from '@tokencontrol/shared';
 import { asc, eq } from 'drizzle-orm';
 import { entities } from '../db/schema';
 import type { ServerConfig } from './config';
@@ -18,6 +18,16 @@ export function entityClass(row: EntityRow): EntityClassDef {
 
 export function entityModules(row: EntityRow): ModuleId[] {
   return Array.isArray(row.modules) ? (row.modules as ModuleId[]) : [];
+}
+
+/** Есть ли у сущности модуль, открывающий данный приказ (ТЗ v0.02 п. 3.2). */
+export function hasModuleGranting(row: EntityRow, action: ActionType): boolean {
+  return entityModules(row).some((m) => MODULES[m]?.grants.includes(action));
+}
+
+/** Суммарный урон всех установленных боевых модулей; 0 — нечем атаковать. */
+export function totalDamage(row: EntityRow): number {
+  return entityModules(row).reduce((sum, m) => sum + (MODULES[m]?.damage ?? 0), 0);
 }
 
 /**
