@@ -52,11 +52,16 @@ cd client/src-tauri && cargo run --bin connector_cli -- misha
   по кругу.
 - Ассистент (опционально, ТЗ v0.02 п. 7): чат отвечает на вопросы по Базе
   Знаний и может отдавать приказы флоту естественным языком — списывает ОВМ
-  из общего буфера. Нужен локально поднятый [Ollama](https://ollama.com) с
-  моделью, поддерживающей tool-calling (по умолчанию клиент ждёт `qwen2.5:3b`
-  на `http://127.0.0.1:11434/v1` — `ollama pull qwen2.5:3b`); адрес и модель
-  меняются в Настройках, там же кнопка «Проверить» связь. Без поднятого
-  Ollama экран честно сообщает об этом — остальная игра не зависит от этой фазы.
+  из общего буфера. Движок Ollama (CPU-only, без GPU-ускорения — ~70 МБ)
+  зашит в десктоп-сборку как sidecar и поднимается сам при входе в игру;
+  если у вас уже есть свой Ollama (например, с GPU-ускорением) на том же
+  адресе — используется он, встроенный не трогается. Сама модель (по
+  умолчанию `qwen2.5:3b`, ~2 ГБ) не входит в сборку — скачивается по явному
+  согласию при первом обращении к ассистенту или кнопкой «Скачать модель» в
+  Настройках. Для сборки sidecar-бинарника (разработчикам, не игрокам):
+  `node client/scripts/fetch-ollama-sidecar.mjs` перед `tauri dev`/`tauri
+  build`. Без движка/модели экран честно сообщает об этом — остальная игра не
+  зависит от этой фазы.
 - Дебаг-режим: войдите с позывным `DEBUG` — в Настройках появится панель
   отладки (например, `[B] +1000 ОВМ в буфер`). Работает только для этого
   позывного, сервер остальных не пустит.
@@ -140,6 +145,7 @@ Token Control/
 └─ client/                    # Tauri-приложение
    ├─ vite.config.ts          # dev-прокси /api и /ws → сервер :8787
    ├─ index.html              # точка входа веб-части
+   ├─ scripts/fetch-ollama-sidecar.mjs # готовит CPU-only Ollama sidecar (~70 МБ) для сборки
    ├─ src/                    # веб-UI: Svelte 5 (runes)
    │  ├─ main.ts, app.css     # монтирование и терминальная тема (палитра, панели)
    │  ├─ App.svelte           # оболочка: шапка-телеметрия, меню, экраны, строка сообщений
@@ -164,12 +170,14 @@ Token Control/
    │     ├─ Knowledge.svelte  # База Знаний и Технологии
    │     └─ Assistant.svelte  # чат с ИИ-ассистентом, подтверждение команд флоту
    └─ src-tauri/              # Rust-часть
-      ├─ tauri.conf.json      # окно, сборка, идентификатор приложения
+      ├─ tauri.conf.json      # окно, сборка, externalBin/resources для Ollama sidecar
       ├─ capabilities/default.json # разрешения: core, http (localhost — для ассистента)
-      ├─ Cargo.toml           # tauri, tauri-plugin-http, tauri-plugin-log, rusqlite, reqwest
+      ├─ Cargo.toml           # tauri, tauri-plugin-http/shell/log, rusqlite, reqwest
+      ├─ binaries/            # (не в git) готовится fetch-ollama-sidecar.mjs
       └─ src/
          ├─ main.rs           # точка входа десктоп-приложения
-         ├─ lib.rs            # Tauri: плагины, команды connector_start/stop, трей
+         ├─ lib.rs            # Tauri: плагины, команды connector_start/stop/ollama_ensure_running, трей
+         ├─ ollama.rs         # авто-поднятие встроенного/чужого Ollama, проверка модели
          ├─ bin/connector_cli.rs # коннектор без окна — для отладки
          └─ connector/        # коннектор Claude Code (ТЗ п. 7)
             ├─ mod.rs         # цикл: рескан 10с → дедуп → ОВМ → outbox → отправка 30с; baseline

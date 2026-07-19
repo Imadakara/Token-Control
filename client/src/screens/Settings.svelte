@@ -1,18 +1,43 @@
 <script lang="ts">
   import { api } from '../lib/api';
-  import { assistantSettings, checkConnection } from '../lib/assistant.svelte';
+  import {
+    assistantSettings,
+    checkConnection,
+    ollamaAutoStatus,
+    pullModel,
+  } from '../lib/assistant.svelte';
   import { connector } from '../lib/connector.svelte';
   import { game } from '../lib/game.svelte';
   import { i18n, t } from '../lib/i18n.svelte';
+  import Confirm from '../lib/terminal/Confirm.svelte';
 
   let debugBusy = $state(false);
   let connChecking = $state(false);
   let connOk = $state<boolean | null>(null);
+  let pendingDownload = $state(false);
+  let downloading = $state(false);
+  let downloadProgress = $state<{ status: string; percent: number | null } | null>(null);
+  let downloadError = $state<string | null>(null);
 
   async function testConnection() {
     connChecking = true;
     connOk = await checkConnection();
     connChecking = false;
+  }
+
+  async function confirmDownload() {
+    pendingDownload = false;
+    downloading = true;
+    downloadError = null;
+    downloadProgress = { status: '', percent: null };
+    try {
+      await pullModel(assistantSettings.model, (p) => (downloadProgress = p));
+      ollamaAutoStatus.modelAvailable = true;
+    } catch (err) {
+      downloadError = (err as Error).message;
+    }
+    downloading = false;
+    downloadProgress = null;
   }
 
   async function debugCredit() {
@@ -88,6 +113,23 @@
       <span class="err">{t('НЕДОСТУПНО')}</span>
     {/if}
   </p>
+  {#if ollamaAutoStatus.modelAvailable === false || downloading}
+    <p>
+      <button onclick={() => (pendingDownload = true)} disabled={downloading}>
+        {t('СКАЧАТЬ МОДЕЛЬ')}
+      </button>
+      {#if downloading}
+        <span class="dim">
+          {t('ЗАГРУЗКА МОДЕЛИ')}{downloadProgress?.percent !== null && downloadProgress?.percent !== undefined
+            ? `: ${downloadProgress.percent}%`
+            : '...'}
+        </span>
+      {/if}
+    </p>
+    {#if downloadError}
+      <p class="err">{t('ОШИБКА ЗАГРУЗКИ:')} {downloadError}</p>
+    {/if}
+  {/if}
 </div>
 
 <div class="panel" style="margin-top:0.5rem">
@@ -105,6 +147,14 @@
       <button onclick={debugCredit} disabled={debugBusy}>{t('[B] +1000 ОВМ В БУФЕР')}</button>
     </p>
   </div>
+{/if}
+
+{#if pendingDownload}
+  <Confirm
+    message={`${t('СКАЧАТЬ МОДЕЛЬ АССИСТЕНТА')} (${assistantSettings.model}, ~2 ${t('ГБ')})? ${t('ПОНАДОБИТСЯ ОДИН РАЗ.')}`}
+    onconfirm={() => void confirmDownload()}
+    oncancel={() => (pendingDownload = false)}
+  />
 {/if}
 
 <style>

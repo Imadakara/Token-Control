@@ -1,6 +1,13 @@
 <script lang="ts">
   import type { ChatMessage, ResolvedCall } from '../lib/assistant.svelte';
-  import { askAssistant, buildFleetContext, resolveToolCall } from '../lib/assistant.svelte';
+  import {
+    askAssistant,
+    assistantSettings,
+    buildFleetContext,
+    ollamaAutoStatus,
+    pullModel,
+    resolveToolCall,
+  } from '../lib/assistant.svelte';
   import { api } from '../lib/api';
   import { game } from '../lib/game.svelte';
   import { t } from '../lib/i18n.svelte';
@@ -24,6 +31,11 @@
   let pendingCall = $state<Exclude<ResolvedCall, { kind: 'error' }> | null>(null);
   let messagesEl: HTMLDivElement | undefined;
   let confirmResolve: (() => void) | null = null;
+
+  /** Модель — большая (~2 ГБ) загрузка, только по явному согласию игрока. */
+  let pendingDownload = $state(false);
+  let downloading = $state(false);
+  let downloadProgress = $state<{ status: string; percent: number | null } | null>(null);
 
   $effect(() => {
     void messages.length;
@@ -70,9 +82,32 @@
     confirmResolve = null;
   }
 
+  async function onDownloadConfirm(): Promise<void> {
+    pendingDownload = false;
+    downloading = true;
+    downloadProgress = { status: '', percent: null };
+    try {
+      await pullModel(assistantSettings.model, (p) => (downloadProgress = p));
+      ollamaAutoStatus.modelAvailable = true;
+      pushMsg('system', t('МОДЕЛЬ ЗАГРУЖЕНА'));
+    } catch (err) {
+      pushMsg('system', `${t('ОШИБКА ЗАГРУЗКИ:')} ${(err as Error).message}`);
+    }
+    downloading = false;
+    downloadProgress = null;
+  }
+
+  function onDownloadCancel(): void {
+    pendingDownload = false;
+  }
+
   async function send(): Promise<void> {
     const text = input.trim();
-    if (!text || busy || !game.state) return;
+    if (!text || busy || !game.state || downloading) return;
+    if (ollamaAutoStatus.modelAvailable === false) {
+      pendingDownload = true;
+      return;
+    }
     input = '';
     pushMsg('user', text);
     busy = true;
@@ -134,6 +169,14 @@
     {#if busy}
       <p class="dim">{t('АССИСТЕНТ ДУМАЕТ...')}</p>
     {/if}
+    {#if downloading}
+      <p class="dim">
+        {t('ЗАГРУЗКА МОДЕЛИ')}{downloadProgress?.percent !== null && downloadProgress?.percent !== undefined
+          ? `: ${downloadProgress.percent}%`
+          : '...'}
+        {#if downloadProgress?.status}({downloadProgress.status}){/if}
+      </p>
+    {/if}
   </div>
   <form
     class="input-row"
@@ -142,8 +185,8 @@
       void send();
     }}
   >
-    <input bind:value={input} placeholder={t('СООБЩЕНИЕ...')} disabled={busy} />
-    <button type="submit" disabled={busy || !input.trim()}>{t('ОТПРАВИТЬ')}</button>
+    <input bind:value={input} placeholder={t('СООБЩЕНИЕ...')} disabled={busy || downloading} />
+    <button type="submit" disabled={busy || downloading || !input.trim()}>{t('ОТПРАВИТЬ')}</button>
   </form>
 </div>
 
@@ -152,6 +195,14 @@
     message={`${t('АССИСТЕНТ ХОЧЕТ:')} ${pendingCall.description}`}
     onconfirm={() => void onConfirmYes()}
     oncancel={onConfirmNo}
+  />
+{/if}
+
+{#if pendingDownload}
+  <Confirm
+    message={`${t('СКАЧАТЬ МОДЕЛЬ АССИСТЕНТА')} (${assistantSettings.model}, ~2 ${t('ГБ')})? ${t('ПОНАДОБИТСЯ ОДИН РАЗ.')}`}
+    onconfirm={() => void onDownloadConfirm()}
+    oncancel={onDownloadCancel}
   />
 {/if}
 

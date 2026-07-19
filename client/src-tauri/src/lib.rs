@@ -1,4 +1,5 @@
 pub mod connector;
+pub mod ollama;
 
 use std::sync::mpsc;
 use std::sync::Mutex;
@@ -63,8 +64,13 @@ fn connector_stop(state: tauri::State<'_, ConnectorHandle>) -> Result<(), String
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_http::init())
+        .plugin(tauri_plugin_shell::init())
         .manage(ConnectorHandle::default())
-        .invoke_handler(tauri::generate_handler![connector_start, connector_stop])
+        .invoke_handler(tauri::generate_handler![
+            connector_start,
+            connector_stop,
+            ollama::ollama_ensure_running
+        ])
         .setup(|app| {
             if cfg!(debug_assertions) {
                 app.handle().plugin(

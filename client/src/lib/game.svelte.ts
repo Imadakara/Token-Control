@@ -9,6 +9,7 @@ import type {
   StateResponse,
 } from '@tokencontrol/shared';
 import { api, connectWs, getToken, hasToken, logout } from './api';
+import { ensureOllamaRunning } from './assistant.svelte';
 import { connector } from './connector.svelte';
 import { t } from './i18n.svelte';
 import type { Screen } from './screens';
@@ -165,6 +166,10 @@ class Game {
     // Внутри Tauri-оболочки поднимаем Rust-коннектор Claude Code
     const token = getToken();
     if (token) void connector.start(token);
+
+    // Встроенный движок ассистента (Strategy - Plan.md) — best-effort,
+    // не блокирует вход; в браузерной сборке и для внешних адресов — no-op.
+    void ensureOllamaRunning();
   }
 
   private startPolling(): void {

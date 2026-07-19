@@ -304,6 +304,13 @@ const EN: Record<string, string> = {
   'СООБЩЕНИЕ...': 'MESSAGE...',
   'ОТПРАВИТЬ': 'SEND',
   'АССИСТЕНТ ХОЧЕТ:': 'ASSISTANT WANTS TO:',
+  'ГБ': 'GB',
+  'СКАЧАТЬ МОДЕЛЬ': 'DOWNLOAD MODEL',
+  'СКАЧАТЬ МОДЕЛЬ АССИСТЕНТА': 'DOWNLOAD ASSISTANT MODEL',
+  'ПОНАДОБИТСЯ ОДИН РАЗ.': 'NEEDED ONCE.',
+  'ЗАГРУЗКА МОДЕЛИ': 'DOWNLOADING MODEL',
+  'МОДЕЛЬ ЗАГРУЖЕНА': 'MODEL DOWNLOADED',
+  'ОШИБКА ЗАГРУЗКИ:': 'DOWNLOAD ERROR:',
 };
 
 class I18n {

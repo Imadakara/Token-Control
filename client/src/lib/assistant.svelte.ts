@@ -62,6 +62,90 @@ export async function checkConnection(): Promise<boolean> {
   }
 }
 
+/** Корень Ollama-API без OpenAI-совместимого суффикса /v1 — там живёт /api/pull. */
+function apiRoot(baseUrl: string): string {
+  return baseUrl.replace(/\/v1\/?$/, '');
+}
+
+function isLocalOllamaUrl(url: string): boolean {
+  try {
+    const { hostname } = new URL(url);
+    return hostname === '127.0.0.1' || hostname === 'localhost';
+  } catch {
+    return false;
+  }
+}
+
+class OllamaAutoStatus {
+  /** 'idle' — ещё не проверяли в этой сессии. */
+  state = $state<'idle' | 'running' | 'unavailable'>('idle');
+  modelAvailable = $state<boolean | null>(null);
+}
+
+export const ollamaAutoStatus = new OllamaAutoStatus();
+
+/**
+ * Встроенный движок (Strategy - Plan.md): если по настроенному локальному
+ * адресу уже кто-то отвечает (свой Ollama игрока, в т.ч. с GPU-ускорением) —
+ * не трогаем; иначе поднимаем sidecar, зашитый в сборку (game/ollama.rs).
+ * Только внутри Tauri и только для локального адреса — best-effort, ошибка
+ * не должна ничего ломать (ручная «ПРОВЕРИТЬ» остаётся рабочей независимо).
+ */
+export async function ensureOllamaRunning(): Promise<void> {
+  if (!isTauri() || !isLocalOllamaUrl(assistantSettings.baseUrl)) return;
+  try {
+    const { invoke } = await import('@tauri-apps/api/core');
+    const status = await invoke<{ state: string; modelAvailable: boolean | null }>(
+      'ollama_ensure_running',
+      { baseUrl: assistantSettings.baseUrl, model: assistantSettings.model },
+    );
+    ollamaAutoStatus.state = status.state === 'running' ? 'running' : 'unavailable';
+    ollamaAutoStatus.modelAvailable = status.modelAvailable;
+  } catch {
+    /* best-effort — ручная проверка в Настройках остаётся рабочим путём */
+  }
+}
+
+interface PullProgress {
+  status: string;
+  percent: number | null;
+}
+
+/**
+ * Скачивание модели — ТОЛЬКО по явному действию игрока (клик по кнопке),
+ * никогда не вызывается автоматически: это разовая загрузка ~2 ГБ.
+ */
+export async function pullModel(
+  model: string,
+  onProgress: (p: PullProgress) => void,
+): Promise<void> {
+  const res = await httpFetch(`${apiRoot(assistantSettings.baseUrl)}/api/pull`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name: model, stream: true }),
+  });
+  if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`);
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split('\n');
+    buffer = lines.pop() ?? '';
+    for (const line of lines) {
+      if (!line.trim()) continue;
+      const chunk = JSON.parse(line) as { status: string; completed?: number; total?: number; error?: string };
+      if (chunk.error) throw new Error(chunk.error);
+      const percent =
+        chunk.total && chunk.completed ? Math.round((chunk.completed / chunk.total) * 100) : null;
+      onProgress({ status: chunk.status, percent });
+    }
+  }
+}
+
 export interface ChatMessage {
   role: 'user' | 'assistant' | 'system';
   content: string;

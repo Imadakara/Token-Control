@@ -33,6 +33,12 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
+    "externalBin": [
+      "binaries/ollama"
+    ],
+    "resources": {
+      "binaries/lib/ollama": "lib/ollama"
+    },
     "android": {
       "debugApplicationIdSuffix": ".debug"
     }

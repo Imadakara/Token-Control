@@ -8,6 +8,9 @@ build/
 
 # Tauri / Rust
 client/src-tauri/target/
+# Ollama sidecar (client/scripts/fetch-ollama-sidecar.mjs) — крупный бинарник,
+# готовится перед сборкой, не хранится в репозитории.
+client/src-tauri/binaries/
 
 # OS
 Thumbs.db
