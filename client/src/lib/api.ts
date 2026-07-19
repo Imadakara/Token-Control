@@ -2,13 +2,16 @@ import type {
   ActionParams,
   ActionType,
   AuthResponse,
+  ChainResponse,
   ConfigResponse,
   GalaxyMapResponse,
+  KnowledgeResponse,
   LogResponse,
   OrdersAddResponse,
   OrdersAvailableResponse,
   SectorMapResponse,
   StateResponse,
+  TechResponse,
   WsServerMessage,
 } from '@tokencontrol/shared';
 
@@ -98,11 +101,25 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ entityId, name }),
     }),
+  /** Только реально открытые игроком записи (ТЗ v0.02 п. 5). */
+  knowledge: () => request<KnowledgeResponse>('/knowledge'),
+  tech: () => request<TechResponse>('/tech'),
+  techResearch: (techId: string) =>
+    request<StateResponse>('/tech/research', { method: 'POST', body: JSON.stringify({ techId }) }),
+  /** Цепь Миров (ТЗ v0.02 п. 4). */
+  chain: () => request<ChainResponse>('/chain'),
+  chainConnect: (keyId: string) =>
+    request<StateResponse>('/chain/connect', { method: 'POST', body: JSON.stringify({ keyId }) }),
   /** Дебаг-команда (сервер пускает только капитана DEBUG). */
   debugCredit: (ovm: number) =>
     request<StateResponse>('/debug/credit', { method: 'POST', body: JSON.stringify({ ovm }) }),
   debugSpawn: (classId: string) =>
     request<StateResponse>('/debug/spawn', { method: 'POST', body: JSON.stringify({ classId }) }),
+  debugChainKey: (targetSectorId?: string) =>
+    request<{ keyId: string }>('/debug/chain-key', {
+      method: 'POST',
+      body: JSON.stringify({ targetSectorId }),
+    }),
 };
 
 /** WS-подписка на пуши сервера; переподключение с бэкоффом. */

@@ -36,6 +36,20 @@
       "when": 1784414843053,
       "tag": "0004_drop_ships",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1784451486484,
+      "tag": "0005_knowledge",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1784454535276,
+      "tag": "0006_chain",
+      "breakpoints": true
     }
   ]
 }

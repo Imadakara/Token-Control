@@ -109,8 +109,10 @@ const EN: Record<string, string> = {
   'ПОДБОР ОБЪЕКТА': 'PICK UP OBJECT',
   'АТАКА': 'ATTACK',
   'СПЕЦИАЛЬНОЕ ДЕЙСТВИЕ': 'SPECIAL ACTION',
+  'ПОСТРОЙКА ВРАТ': 'BUILD GATE',
   'НЕТ МОДУЛЯ': 'NO MODULE',
   'НЕТ МОДУЛЯ ВООРУЖЕНИЯ': 'NO WEAPON MODULE',
+  'НУЖНА ТОЧКА': 'POINT REQUIRED',
 
   // Карты
   'КАРТА СЕКТОРА': 'SECTOR MAP',
@@ -140,8 +142,23 @@ const EN: Record<string, string> = {
   '▪ ПОСЕЩЁН': '▪ VISITED',
   '· НЕИЗВЕСТЕН': '· UNKNOWN',
   'КУРСОР:': 'CURSOR:',
-  'ГИПЕРПРЫЖОК В MVP — ТОЛЬКО В СОСЕДНИЕ СЕКТОРА': 'MVP HYPERJUMP — ADJACENT SECTORS ONLY',
   '[←↑↓→] КУРСОР [ENTER] ВЫБОР': '[←↑↓→] CURSOR [ENTER] SELECT',
+
+  // Цепь Миров, врата (ТЗ v0.02 п. 4)
+  '◆ СВЯЗАН ЦЕПЬЮ': '◆ CHAIN-LINKED',
+  'ГИПЕРПРЫЖОК ТОЛЬКО ПО РЁБРАМ ЦЕПИ МИРОВ — ТРЕБУЕТСЯ ТЕХНОЛОГИЯ И СВОИ ВРАТА В СЕКТОРЕ':
+    'HYPERJUMP ONLY ALONG CHAIN OF WORLDS LINKS — REQUIRES TECH AND YOUR OWN GATE IN SECTOR',
+  'ТРЕБУЕТСЯ ТЕХНОЛОГИЯ: ГИПЕРПРЫЖОК': 'TECHNOLOGY REQUIRED: HYPERJUMP',
+  'НЕТ ВРАТ В СЕКТОРЕ': 'NO GATE IN SECTOR',
+  'НЕТ СВЯЗИ В ЦЕПИ МИРОВ': 'NO CHAIN OF WORLDS LINK',
+  'КЛЮЧИ ЦЕПИ МИРОВ': 'CHAIN OF WORLDS KEYS',
+  'КЛЮЧЕЙ НЕТ': 'NO KEYS',
+  'СЛУЧАЙНАЯ ЦЕЛЬ': 'RANDOM TARGET',
+  'ИСПОЛЬЗОВАН': 'USED',
+  'ПРИМЕНИТЬ': 'APPLY',
+  'ДЕБАГ: ПОЛУЧИТЬ КЛЮЧ': 'DEBUG: GET KEY',
+  'КЛЮЧ ПРИМЕНЁН — ДОМАШНИЙ СЕКТОР ПОДКЛЮЧЁН К ЦЕПИ': 'KEY APPLIED — HOME SECTOR CHAIN-LINKED',
+  'ДЕБАГ: КЛЮЧ ВЫДАН': 'DEBUG: KEY GRANTED',
 
   // Трюм
   'ЗАНЯТО:': 'USED:',
@@ -208,6 +225,44 @@ const EN: Record<string, string> = {
   'ВЫБЕРИТЕ СЕКТОР [ENTER] — ОТМЕНА [ESC]': 'PICK SECTOR [ENTER] — CANCEL [ESC]',
   'ЗДЕСЬ НЕТ ОБЪЕКТА — [TAB] ПЕРЕБОР ЦЕЛЕЙ': 'NO OBJECT HERE — [TAB] CYCLE TARGETS',
   'РАССТЫКОВКА ВЫПОЛНЕНА': 'UNDOCKED',
+
+  // База Знаний и Технологии (ТЗ v0.02 пп. 5–6)
+  'ЗАГРУЗКА ДАННЫХ': 'UPLOAD DATA',
+  'БАЗА ЗНАНИЙ И ТЕХНОЛОГИИ': 'KNOWLEDGE BASE & TECHNOLOGY',
+  'ЗАПИСИ': 'ENTRIES',
+  'ТЕХНОЛОГИИ': 'TECHNOLOGY',
+  'ВЕТКА': 'BRANCH',
+  'НАВИГАЦИЯ': 'NAVIGATION',
+  'ПРОМЫШЛЕННОСТЬ': 'INDUSTRY',
+  'ОБОРОНА': 'DEFENSE',
+  'ИЗУЧЕНА': 'RESEARCHED',
+  'НЕ ИЗУЧЕНА': 'NOT RESEARCHED',
+  'СТОИМОСТЬ': 'COST',
+  'ТРЕБУЕТ:': 'REQUIRES:',
+  'ДАННЫЕ:': 'DATA:',
+  'ОТКРЫВАЕТ:': 'UNLOCKS:',
+  'ГОТОВА К ИЗУЧЕНИЮ [ENTER]': 'READY TO RESEARCH [ENTER]',
+  'ТРЕБУЕТСЯ:': 'REQUIRES:',
+  'НЕДОСТАТОЧНО ДАННЫХ': 'INSUFFICIENT DATA',
+  'НЕДОСТАТОЧНО ДАННЫХ В БАЗЕ ЗНАНИЙ': 'INSUFFICIENT KNOWLEDGE BASE DATA',
+  'НЕДОСТАТОЧНО ОВМ': 'INSUFFICIENT CPP',
+  'УЖЕ ИЗУЧЕНА': 'ALREADY RESEARCHED',
+  'НЕИЗВЕСТНАЯ ТЕХНОЛОГИЯ': 'UNKNOWN TECHNOLOGY',
+  'ИЗУЧИТЬ': 'RESEARCH',
+  'ЗА': 'FOR',
+  'ТЕХНОЛОГИЯ ИЗУЧЕНА': 'TECHNOLOGY RESEARCHED',
+  'ИНФОРМАЦИЯ': 'INFO',
+  'МОДУЛЬ': 'MODULE',
+  'ПОСТРОЙКА': 'BUILD',
+  'ПОИСК ПО ЗАПИСЯМ...': 'SEARCH ENTRIES...',
+  'ЗАГРУЗКА...': 'LOADING...',
+  'НАВЕДИТЕ КУРСОР НА ЗАПИСЬ ИЛИ ТЕХНОЛОГИЮ': 'HOVER AN ENTRY OR TECHNOLOGY',
+  'НЕТ ДАННЫХ В ТРЮМЕ': 'NO DATA IN CARGO HOLD',
+  'ЗАГРУЗКА ОТМЕНЕНА: ДАННЫЕ ОТСУТСТВУЮТ': 'UPLOAD CANCELLED: NO DATA',
+  'ЗАГРУЗКА ЗАВЕРШЕНА: ДАННЫЕ НЕ РАСПОЗНАНЫ': 'UPLOAD COMPLETE: DATA NOT RECOGNIZED',
+  'ТРЕБУЕТСЯ ТЕХНОЛОГИЯ: ВООРУЖЕНИЕ': 'TECHNOLOGY REQUIRED: WEAPONS',
+  '[↑↓] ВЫБОР [←→] СВЕРНУТЬ/РАЗВЕРНУТЬ [ENTER] ВЫБРАТЬ/ИЗУЧИТЬ':
+    '[↑↓] SELECT [←→] COLLAPSE/EXPAND [ENTER] PICK/RESEARCH',
 };
 
 class I18n {

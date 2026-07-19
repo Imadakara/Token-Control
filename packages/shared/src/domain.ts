@@ -17,6 +17,9 @@ export const ACTION_TYPES = [
   'pickup',
   'attack',
   'special',
+  'upload_data',
+  /** Постройка межзвёздных врат (ТЗ v0.02 п. 4) — см. game/chain.ts. */
+  'build_gate',
 ] as const;
 export type ActionType = (typeof ACTION_TYPES)[number];
 

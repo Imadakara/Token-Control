@@ -31,6 +31,8 @@ export const ACTION_LABELS: Record<ActionType, string> = {
   pickup: 'ПОДБОР ОБЪЕКТА',
   attack: 'АТАКА',
   special: 'СПЕЦИАЛЬНОЕ ДЕЙСТВИЕ',
+  upload_data: 'ЗАГРУЗКА ДАННЫХ',
+  build_gate: 'ПОСТРОЙКА ВРАТ',
 };
 
 /** Статус сущности (ТЗ v0.02 п. 2); используется во «Флотилии», «Приказах» и на карте. */
@@ -252,9 +254,11 @@ class Game {
       case 'scan':
       case 'interact':
       case 'special':
+      case 'upload_data':
         await this.enqueue(action, null, targets);
         break;
       case 'move':
+      case 'build_gate':
         this.pick = { action, target: 'point', entityIds: targets };
         this.screen = 'sector';
         this.say('ВЫБЕРИТЕ ТОЧКУ ИЛИ ОБЪЕКТ [ENTER] — ОТМЕНА [ESC]');

@@ -183,3 +183,65 @@ export const gameConfig = pgTable('game_config', {
   key: text('key').primaryKey(),
   value: jsonb('value').notNull(),
 });
+
+/**
+ * База Знаний и Технологии (ТЗ v0.02 пп. 5–6): контент — статичный каталог в
+ * @tokencontrol/shared, здесь только прогресс игрока. entry_id/tech_id —
+ * ключи каталога, не FK: контент версионируется в коде, не в БД.
+ */
+export const playerKnowledge = pgTable(
+  'player_knowledge',
+  {
+    playerId: text('player_id')
+      .notNull()
+      .references(() => players.id),
+    entryId: text('entry_id').notNull(),
+    unlockedAt: timestamp('unlocked_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.playerId, t.entryId] })],
+);
+
+export const playerTech = pgTable(
+  'player_tech',
+  {
+    playerId: text('player_id')
+      .notNull()
+      .references(() => players.id),
+    techId: text('tech_id').notNull(),
+    researchedAt: timestamp('researched_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.playerId, t.techId] })],
+);
+
+/**
+ * Цепь Миров (ТЗ v0.02 п. 4): рёбра — глобальные и общие для всех игроков
+ * (топология Цепи не скрыта, в отличие от содержимого секторов). Ребро
+ * неориентированное — хранится один раз, a_sector_id < b_sector_id
+ * лексикографически (canonicalPair в game/chain.ts), иначе (a,b) и (b,a)
+ * считались бы разными рёбрами.
+ */
+export const sectorLinks = pgTable(
+  'sector_links',
+  {
+    aSectorId: text('a_sector_id').notNull(),
+    bSectorId: text('b_sector_id').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.aSectorId, t.bSectorId] })],
+);
+
+/**
+ * Ключ Цепи Миров — точка монетизации (ТЗ п. 4): реальную продажу выдаёт
+ * Steam в фазе 99, здесь только механика потребления. target_sector_id null —
+ * ключ «в случайный подключённый мир», конкретный сектор выбирается при
+ * применении (game/chain.ts).
+ */
+export const chainKeys = pgTable('chain_keys', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  playerId: text('player_id')
+    .notNull()
+    .references(() => players.id),
+  targetSectorId: text('target_sector_id'),
+  source: text('source').notNull().default('debug'),
+  consumedAt: timestamp('consumed_at', { withTimezone: true }),
+});

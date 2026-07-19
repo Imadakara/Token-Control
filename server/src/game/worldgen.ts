@@ -1,3 +1,4 @@
+import { KNOWLEDGE_ENTRIES } from '@tokencontrol/shared';
 import { createRng } from './rng';
 
 /** Параметры генерации (часть game_config, ТЗ п. 12.2). */
@@ -104,11 +105,18 @@ export function generateSector(sectorId: string, world: WorldGenParams): Generat
 
   const containers = rng.int(0, 3);
   for (let i = 0; i < containers; i++) {
+    const contents = rng.pick(['scrap', 'supplies', 'data-core'] as const);
+    const props: Record<string, unknown> = { contents };
+    // data-core несёт запись Базы Знаний (ТЗ v0.02 п. 5) — какую именно,
+    // решает тот же детерминированный rng, что и остальное содержимое сектора.
+    if (contents === 'data-core') {
+      props.entryId = rng.pick(KNOWLEDGE_ENTRIES.map((e) => e.id));
+    }
     objects.push({
       type: 'container',
       x: coord(),
       y: coord(),
-      props: { contents: rng.pick(['scrap', 'supplies', 'data-core']) },
+      props,
       resourceType: null,
       resourceAmount: null,
       maxResource: null,

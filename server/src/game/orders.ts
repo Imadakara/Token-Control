@@ -4,6 +4,7 @@ import { and, eq } from 'drizzle-orm';
 import { knownObjects, objects, queues } from '../db/schema';
 import { validateAction, type ActionCtx } from './actions';
 import { hasModuleGranting, totalDamage, type EntityRow } from './entities';
+import { hasTech } from './knowledge';
 
 /**
  * Список приказов, доступных сущности прямо сейчас (ТЗ v0.02 п. 3.1): для
@@ -23,6 +24,8 @@ const TARGET_KIND: Record<ActionType, OrderTarget> = {
   pickup: 'object',
   attack: 'object',
   special: 'none',
+  upload_data: 'none',
+  build_gate: 'point',
 };
 
 type ObjectRow = typeof objects.$inferSelect;
@@ -64,15 +67,24 @@ const NO_CANDIDATES_REASON: Partial<Record<ActionType, string>> = {
 };
 
 /**
- * Приказ требует модуля — проверяем это ДО поиска кандидатов, а не полагаемся
- * на то, что validateAction его отловит: иначе сущность без бурового лазера,
- * стоящая рядом с астероидом, получила бы «НЕТ РЕСУРСА РЯДОМ» вместо честного
- * «НЕТ МОДУЛЯ» (ТЗ v0.02 п. 3.2, критерий фазы 9).
+ * Приказ требует модуля (и, для attack, изученной технологии) — проверяем
+ * это ДО поиска кандидатов, а не полагаемся на то, что validateAction его
+ * отловит: иначе сущность без бурового лазера, стоящая рядом с астероидом,
+ * получила бы «НЕТ РЕСУРСА РЯДОМ» вместо честного «НЕТ МОДУЛЯ» (ТЗ v0.02
+ * п. 3.2, критерий фазы 9), а безоружная — вместо «ТРЕБУЕТСЯ ТЕХНОЛОГИЯ»
+ * (ТЗ п. 6, критерий фазы 10).
  */
-function moduleGateReason(entity: EntityRow, action: ActionType): string | null {
+async function capabilityGateReason(
+  ctx: ActionCtx,
+  entity: EntityRow,
+  action: ActionType,
+): Promise<string | null> {
   if ((action === 'analyze' || action === 'mine' || action === 'special') && !hasModuleGranting(entity, action))
     return 'НЕТ МОДУЛЯ';
-  if (action === 'attack' && totalDamage(entity) <= 0) return 'НЕТ МОДУЛЯ ВООРУЖЕНИЯ';
+  if (action === 'attack') {
+    if (totalDamage(entity) <= 0) return 'НЕТ МОДУЛЯ ВООРУЖЕНИЯ';
+    if (!(await hasTech(ctx.db, ctx.pid, 'def.weapons'))) return 'ТРЕБУЕТСЯ ТЕХНОЛОГИЯ: ВООРУЖЕНИЕ';
+  }
   return null;
 }
 
@@ -80,7 +92,7 @@ async function optionFor(ctx: ActionCtx, entity: EntityRow, action: ActionType):
   const costOvm = ctx.cfg.game.actionCosts[action];
   const target = TARGET_KIND[action];
 
-  const gate = moduleGateReason(entity, action);
+  const gate = await capabilityGateReason(ctx, entity, action);
   if (gate) {
     return { action, costOvm, available: false, reason: gate, target, candidates: [] };
   }

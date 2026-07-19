@@ -344,25 +344,45 @@ describe('очередь и начисления', () => {
     expect((await t.sectorMap()).objects.length).toBeGreaterThan(0); // скан исполнился
   });
 
-  it('гиперпрыжок только в соседний сектор', async () => {
+  it('гиперпрыжок только по рёбрам Цепи Миров (полный цикл — chain.test.ts)', async () => {
+    const pid = 'dev:q9';
     const t = api(await authToken(app, 'q9'));
     const id = (await t.state()).entities[0]!.id;
-    const { DEFAULT_WORLD, parseSectorId, pickHomeSector } = await import('../src/game/worldgen');
-    const home = pickHomeSector('dev:q9', DEFAULT_WORLD);
+    const home = (await t.state()).entities[0]!.sectorId;
+    const { DEFAULT_WORLD, parseSectorId } = await import('../src/game/worldgen');
     const { gx, gy } = parseSectorId(home)!;
-    const neighbour = gx + 1 < DEFAULT_WORLD.galaxyWidth ? `${gx + 1}:${gy}` : `${gx - 1}:${gy}`;
-    const far = `${(gx + 5) % DEFAULT_WORLD.galaxyWidth}:${(gy + 5) % DEFAULT_WORLD.galaxyHeight}`;
+    const linked = `${(gx + 1) % DEFAULT_WORLD.galaxyWidth}:${gy}`;
+    const unlinked = `${(gx + 5) % DEFAULT_WORLD.galaxyWidth}:${(gy + 5) % DEFAULT_WORLD.galaxyHeight}`;
 
-    // Дальний сектор проходит постановку (статическая проверка), но при
+    // Технология и свои врата — без них jump_hyper отклоняется ещё на
+    // постановке (проверено в orders.test.ts); здесь интересует именно
+    // каскад/НЕВЫПОЛНИМО, поэтому выдаём предпосылки напрямую в БД.
+    const { playerTech, entities: entitiesTable } = await import('../src/db/schema');
+    await app.db.insert(playerTech).values({ playerId: pid, techId: 'nav.hyperjump' }).onConflictDoNothing();
+    await app.db.insert(entitiesTable).values({
+      playerId: pid,
+      name: 'ВРАТА-ТЕСТ',
+      classId: 'gate',
+      sectorId: home,
+      x: 0,
+      y: 0,
+      modules: [],
+      hp: 100,
+      hpMax: 100,
+    });
+    const { linkSectors } = await import('../src/game/chain');
+    await app.db.transaction((tx) => linkSectors(tx, home, linked));
+
+    // Несвязанный сектор проходит постановку (статическая проверка), но при
     // активации помечается НЕВЫПОЛНИМО и пропускается с записью в журнал
-    const farRes = await t.add(id, 'jump_hyper', { kind: 'sector', sectorId: far });
+    const farRes = await t.add(id, 'jump_hyper', { kind: 'sector', sectorId: unlinked });
     expect(farRes.statusCode).toBe(200);
     expect((farRes.json() as OrdersAddResponse).results[0]).toMatchObject({ ok: true });
     expect((await t.state()).entities[0]!.orders).toHaveLength(0);
     const log = await t.log();
-    expect(log.entries[0]!.result).toContain('СОСЕДНИЕ');
+    expect(log.entries[0]!.result).toContain('НЕТ СВЯЗИ В ЦЕПИ МИРОВ');
 
-    await t.add(id, 'jump_hyper', { kind: 'sector', sectorId: neighbour });
+    await t.add(id, 'jump_hyper', { kind: 'sector', sectorId: linked });
     await t.submit(400); // за 3 сабмита из-за минутного лимита 500
     await t.submit(400);
     await t.submit(400);
@@ -373,7 +393,7 @@ describe('очередь и начисления', () => {
       expect(entity.orders[0]!.progressOvm).toBe(500);
       expect(entity.sectorId).toBe(home);
     } else {
-      expect(entity.sectorId).toBe(neighbour);
+      expect(entity.sectorId).toBe(linked);
     }
   });
 });

@@ -2,7 +2,9 @@ import type { FastifyInstance } from 'fastify';
 import type { GalaxyMapResponse, SectorMapResponse, SectorObject } from '@tokencontrol/shared';
 import { and, eq } from 'drizzle-orm';
 import { knownObjects, objects, visitedSectors } from '../db/schema';
+import { allChainLinks, hasGateInSector, reachableSectors } from '../game/chain';
 import { leadEntity } from '../game/entities';
+import { hasTech } from '../game/knowledge';
 import { parseSectorId } from '../game/worldgen';
 
 export async function mapRoutes(app: FastifyInstance) {
@@ -53,6 +55,14 @@ export async function mapRoutes(app: FastifyInstance) {
         .from(visitedSectors)
         .where(eq(visitedSectors.playerId, pid));
 
+      // Гиперпрыжок прямо сейчас возможен только с изученной технологией и
+      // собственными вратами в текущем секторе (ТЗ v0.02 п. 4) — без них
+      // список достижимых пуст независимо от рёбер Цепи.
+      const canJump =
+        (await hasTech(app.db, pid, 'nav.hyperjump')) &&
+        (await hasGateInSector(app.db, pid, lead.sectorId));
+      const reachable = canJump ? await reachableSectors(app.db, lead.sectorId) : [];
+
       return {
         currentSectorId: lead.sectorId,
         galaxyWidth: world.galaxyWidth,
@@ -61,6 +71,8 @@ export async function mapRoutes(app: FastifyInstance) {
           const c = parseSectorId(sectorId)!;
           return { id: sectorId, gx: c.gx, gy: c.gy, visited: true };
         }),
+        chainLinks: await allChainLinks(app.db),
+        reachable,
       };
     },
   );

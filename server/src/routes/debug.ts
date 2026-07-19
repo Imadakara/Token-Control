@@ -2,7 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import type { EntityClassId } from '@tokencontrol/shared';
 import { isEntityClassId } from '@tokencontrol/shared';
 import { eq, sql } from 'drizzle-orm';
-import { players } from '../db/schema';
+import { chainKeys, players } from '../db/schema';
 import { createEntity, leadEntity } from '../game/entities';
 import { lockPlayer } from '../game/queue';
 import { buildState, r3 } from '../game/state';
@@ -56,6 +56,26 @@ export async function debugRoutes(app: FastifyInstance) {
       // Рядом с ведущей сущностью — в тех же координатах, то есть в её группе
       await createEntity(app.db, pid, classId, lead.sectorId, lead.x, lead.y);
       return respondWithState(app, pid);
+    },
+  );
+
+  /**
+   * Дебаг: выдача ключа Цепи Миров — реальная продажа (Steam) в фазе 99,
+   * здесь только механика применения ключа (ТЗ п. 4).
+   */
+  app.post<{ Body: { targetSectorId?: string } }>(
+    '/debug/chain-key',
+    { preHandler: [app.authenticate] },
+    async (req, reply) => {
+      const pid = req.user.pid;
+      if (pid !== DEBUG_PID) {
+        return reply.code(403).send({ error: 'ТОЛЬКО ДЛЯ КАПИТАНА DEBUG' });
+      }
+      const [row] = await app.db
+        .insert(chainKeys)
+        .values({ playerId: pid, targetSectorId: req.body?.targetSectorId ?? null, source: 'debug' })
+        .returning();
+      return { keyId: row!.id };
     },
   );
 }

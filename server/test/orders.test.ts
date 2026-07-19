@@ -79,7 +79,13 @@ describe('доступные приказы', () => {
 
     expect(byAction.scan).toMatchObject({ available: true, target: 'none' });
     expect(byAction.move).toMatchObject({ available: true, target: 'point' });
-    expect(byAction.jump_hyper).toMatchObject({ available: true, target: 'sector' });
+    // Стартовое ограничение (ТЗ v0.02 п. 4): без технологии и врат гиперпрыжок
+    // недоступен даже с указанным сектором — полный цикл см. chain.test.ts
+    expect(byAction.jump_hyper).toMatchObject({
+      available: false,
+      target: 'sector',
+      reason: 'ТРЕБУЕТСЯ ТЕХНОЛОГИЯ: ГИПЕРПРЫЖОК',
+    });
     // Ничего не просканировано — целям неоткуда взяться
     expect(byAction.analyze).toMatchObject({ available: false, target: 'object', candidates: [] });
     expect(byAction.mine.available).toBe(false);

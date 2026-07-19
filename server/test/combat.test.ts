@@ -7,12 +7,17 @@ import type {
   StateResponse,
 } from '@tokencontrol/shared';
 import { eq } from 'drizzle-orm';
-import { objects } from '../src/db/schema';
+import { objects, playerTech } from '../src/db/schema';
 import { authToken, createTestApp } from './helpers';
 
 /**
  * Фаза 9 (ТЗ v0.02 п. 3.2): модульные ограничения, «Взаимодействие»
  * (стыковка+расстыковка одним приказом) и минимальная боёвка.
+ *
+ * Атака дополнительно требует изученную технологию def.weapons (фаза 10) —
+ * сам цикл её исследования тестирует knowledge.test.ts; здесь достаточно
+ * выдать её напрямую в БД, чтобы тесты боевой механики не зависели от
+ * прохождения всей цепочки Базы Знаний.
  */
 
 let app: FastifyInstance;
@@ -86,6 +91,15 @@ async function spawnObject(
   return row!.id;
 }
 
+/** Атака дополнительно требует изученную def.weapons (фаза 10) — полный цикл
+ *  исследования тестирует knowledge.test.ts, здесь выдаём технологию напрямую. */
+async function grantWeaponsTech(pid: string): Promise<void> {
+  await app.db
+    .insert(playerTech)
+    .values({ playerId: pid, techId: 'def.weapons' })
+    .onConflictDoNothing();
+}
+
 describe('модульные ограничения (ТЗ v0.02 п. 3.2)', () => {
   it('без бурового модуля ДОБЫЧА недоступна с причиной «НЕТ МОДУЛЯ»; с модулем — доступна', async () => {
     const pid = 'dev:c1';
@@ -133,6 +147,18 @@ describe('модульные ограничения (ТЗ v0.02 п. 3.2)', () =>
     const attackOpt = entities[0]!.orders.find((o) => o.action === 'attack')!;
     expect(attackOpt).toMatchObject({ available: false, reason: 'НЕТ МОДУЛЯ ВООРУЖЕНИЯ' });
   });
+
+  it('с рельсотроном, но без изученной def.weapons — АТАКА недоступна с причиной по технологии', async () => {
+    const t = api(await authToken(app, 'c7'));
+    const lead = (await t.state()).entities[0]!; // scout_mk1: railgun из коробки, tech не изучена
+
+    const { entities } = await t.available(lead.id);
+    const attackOpt = entities[0]!.orders.find((o) => o.action === 'attack')!;
+    expect(attackOpt).toMatchObject({
+      available: false,
+      reason: 'ТРЕБУЕТСЯ ТЕХНОЛОГИЯ: ВООРУЖЕНИЕ',
+    });
+  });
 });
 
 describe('взаимодействие: стыковка и расстыковка одним приказом', () => {
@@ -168,6 +194,7 @@ describe('взаимодействие: стыковка и расстыковк
 describe('минимальная боёвка (ТЗ v0.02 п. 3.2)', () => {
   it('атака снижает HP цели, уничтожение роняет контейнер, который можно подобрать', async () => {
     const t = api(await authToken(app, 'c5'));
+    await grantWeaponsTech('dev:c5');
     const lead = (await t.state()).entities[0]!;
     // scout_mk1 несёт railgun (damage:3) по умолчанию — см. shared/entities.ts
     const targetId = await spawnObject(lead.sectorId, lead.x, lead.y, {
@@ -206,6 +233,7 @@ describe('минимальная боёвка (ТЗ v0.02 п. 3.2)', () => {
 
   it('неуязвимую цель (станцию) атаковать нельзя', async () => {
     const t = api(await authToken(app, 'c6'));
+    await grantWeaponsTech('dev:c6');
     const lead = (await t.state()).entities[0]!;
     const stationId = await spawnObject(lead.sectorId, lead.x, lead.y, {
       type: 'station',

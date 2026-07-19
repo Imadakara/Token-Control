@@ -1,11 +1,14 @@
 import type { ActionParams, ActionType } from '@tokencontrol/shared';
+import { findKnowledgeEntry } from '@tokencontrol/shared';
 import { and, eq, sql } from 'drizzle-orm';
 import { cargo, entities, knownObjects, objects } from '../db/schema';
+import { areLinked, hasGateInSector, joinChainOnGateBuilt } from './chain';
 import type { ServerConfig } from './config';
-import { entityClass, hasModuleGranting, totalDamage, type EntityRow } from './entities';
+import { createEntity, entityClass, hasModuleGranting, totalDamage, type EntityRow } from './entities';
+import { hasTech, unlockEntry } from './knowledge';
 import { cargoUsed, type DbLike } from './state';
 import { ensureSectorGenerated, markVisited } from './world';
-import { sectorExists, sectorsAdjacent } from './worldgen';
+import { sectorExists } from './worldgen';
 
 /**
  * Условия применимости и результаты действий (ТЗ п. 6, ТЗ v0.02 п. 3.2).
@@ -106,14 +109,22 @@ export async function validateAction(
 
     case 'jump_hyper': {
       if (!entityClass(entity).mobile) return { ok: false, reason: 'СУЩНОСТЬ НЕПОДВИЖНА' };
+      // Стартовое ограничение (ТЗ v0.02 п. 4): один сектор, пока не изучен
+      // гиперпрыжок и не построены свои врата — независимо от конкретной цели.
+      if (!(await hasTech(ctx.db, ctx.pid, 'nav.hyperjump')))
+        return { ok: false, reason: 'ТРЕБУЕТСЯ ТЕХНОЛОГИЯ: ГИПЕРПРЫЖОК' };
+      if (!(await hasGateInSector(ctx.db, ctx.pid, entity.sectorId)))
+        return { ok: false, reason: 'НЕТ ВРАТ В СЕКТОРЕ' };
       if (!params || params.kind !== 'sector') {
         if (mode === 'offer') return { ok: true };
         return { ok: false, reason: 'НЕ УКАЗАН СЕКТОР' };
       }
       if (!sectorExists(params.sectorId, ctx.cfg.world))
         return { ok: false, reason: 'СЕКТОР ВНЕ ГАЛАКТИКИ' };
-      if (mode === 'activate' && !sectorsAdjacent(entity.sectorId, params.sectorId))
-        return { ok: false, reason: 'ТОЛЬКО СОСЕДНИЕ СЕКТОРА (MVP)' };
+      // Соседство сеткой (ТЗ v0.01) заменено графом Цепи Миров: рёбра
+      // создаются постройкой врат (auto-join) и покупкой ключей (/chain/connect).
+      if (mode === 'activate' && !(await areLinked(ctx.db, entity.sectorId, params.sectorId)))
+        return { ok: false, reason: 'НЕТ СВЯЗИ В ЦЕПИ МИРОВ' };
       return { ok: true };
     }
 
@@ -172,6 +183,10 @@ export async function validateAction(
 
     case 'attack': {
       if (totalDamage(entity) <= 0) return { ok: false, reason: 'НЕТ МОДУЛЯ ВООРУЖЕНИЯ' };
+      // Технология def.weapons (ТЗ v0.02 п. 6) — первая реально подключённая
+      // Capability: наличия модуля недостаточно без изученного протокола.
+      if (!(await hasTech(ctx.db, ctx.pid, 'def.weapons')))
+        return { ok: false, reason: 'ТРЕБУЕТСЯ ТЕХНОЛОГИЯ: ВООРУЖЕНИЕ' };
       if (mode === 'enqueue') {
         if (!params || params.kind !== 'object') return { ok: false, reason: 'НЕ УКАЗАНА ЦЕЛЬ' };
         const obj = await getObject(ctx, params.objectId);
@@ -192,7 +207,33 @@ export async function validateAction(
       if (!hasModuleGranting(entity, 'special')) return { ok: false, reason: 'НЕТ МОДУЛЯ' };
       return { ok: true };
     }
+
+    case 'upload_data': {
+      if (mode === 'enqueue') return { ok: true };
+      const row = await findDataCore(ctx, entity);
+      return row ? { ok: true } : { ok: false, reason: 'НЕТ ДАННЫХ В ТРЮМЕ' };
+    }
+
+    case 'build_gate': {
+      // Ни модуля, ни технологии не требует — единственный барьер это сама
+      // стоимость (250 000 ОВМ, выше ovmBufferCap): накопить её можно только
+      // в счётчике самого приказа за много сессий (ТЗ v0.02 п. 4).
+      if (!params || params.kind !== 'point') {
+        if (mode === 'offer') return { ok: true };
+        return { ok: false, reason: 'НУЖНА ТОЧКА' };
+      }
+      return { ok: true };
+    }
   }
+}
+
+/** Контейнер с данными («data-core») в трюме сущности — предмет для upload_data. */
+async function findDataCore(ctx: ActionCtx, entity: EntityRow) {
+  const rows = await ctx.db
+    .select()
+    .from(cargo)
+    .where(and(eq(cargo.entityId, entity.id), eq(cargo.kind, 'object')));
+  return rows.find((r) => (r.props as { contents?: string } | null)?.contents === 'data-core') ?? null;
 }
 
 /** Ближайший объект с атрибутом «стыковочный узел» — любого типа, не только станции. */
@@ -393,5 +434,25 @@ export async function executeAction(
       // Недостижимо: validateAction отклоняет ещё на постановке, пока ни один
       // модуль не даёт 'special'. Ветка — задел на будущий модуль (roadmap).
       return 'СПЕЦИАЛЬНОЕ ДЕЙСТВИЕ: НЕТ АКТИВНОГО МОДУЛЯ';
+
+    case 'upload_data': {
+      const row = await findDataCore(ctx, entity);
+      if (!row) return 'ЗАГРУЗКА ОТМЕНЕНА: ДАННЫЕ ОТСУТСТВУЮТ';
+      const entryId = (row.props as { entryId?: string } | null)?.entryId;
+      await db.delete(cargo).where(eq(cargo.id, row.id)); // предмет расходуется
+      const entry = entryId ? findKnowledgeEntry(entryId) : undefined;
+      if (!entry) return 'ЗАГРУЗКА ЗАВЕРШЕНА: ДАННЫЕ НЕ РАСПОЗНАНЫ';
+      await unlockEntry(db, pid, entry.id);
+      return `БАЗА ЗНАНИЙ ПОПОЛНЕНА: ${entry.title}`;
+    }
+
+    case 'build_gate': {
+      const p = params as Extract<ActionParams, { kind: 'point' }>;
+      const gate = await createEntity(db, pid, 'gate', entity.sectorId, p.x, p.y);
+      const target = await joinChainOnGateBuilt(db, entity.sectorId);
+      return target
+        ? `ВРАТА ПОСТРОЕНЫ: ${gate.name} — СЕКТОР ПОДКЛЮЧЁН К ЦЕПИ МИРОВ (${target})`
+        : `ВРАТА ПОСТРОЕНЫ: ${gate.name} — ПЕРВЫЙ УЗЕЛ ЦЕПИ МИРОВ`;
+    }
   }
 }

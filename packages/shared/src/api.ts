@@ -1,5 +1,6 @@
 import type { ActionParams, ActionType, EntityState, OrderOption, SectorObject } from './domain';
 import type { GameConfig } from './config';
+import type { KnowledgeEntry, Tech } from './knowledge';
 
 // ---- Auth ----
 
@@ -47,6 +48,27 @@ export interface OrdersReorderRequest {
   to: number;
 }
 
+// ---- База Знаний и Технологии (ТЗ v0.02 пп. 5–6) ----
+
+/** Только записи, реально открытые игроком (ТЗ п. 7: ассистенту известно не больше). */
+export interface KnowledgeResponse {
+  entries: KnowledgeEntry[];
+}
+
+export interface TechStatus extends Tech {
+  researched: boolean;
+  /** Считается сервером: все requires изучены, все dataCost.entryIds открыты, хватает ОВМ. */
+  researchable: boolean;
+  missingRequires: string[];
+  missingEntries: string[];
+}
+export interface TechResponse {
+  techs: TechStatus[];
+}
+export interface TechResearchRequest {
+  techId: string;
+}
+
 // ---- Fleet ----
 
 /** Новый порядок раздачи ОВМ: полный список id сущностей игрока. */
@@ -88,6 +110,30 @@ export interface GalaxyMapResponse {
   galaxyWidth: number;
   galaxyHeight: number;
   sectors: { id: string; gx: number; gy: number; visited: boolean }[];
+  /** Все известные рёбра Цепи Миров (ТЗ v0.02 п. 4) — сама топология не скрыта. */
+  chainLinks: { a: string; b: string }[];
+  /**
+   * Куда прямо сейчас возможен гиперпрыжок: технология nav.hyperjump изучена,
+   * в текущем секторе есть свои врата, и до сектора есть путь по chainLinks.
+   * Пусто, если хоть одно из первых двух условий не выполнено.
+   */
+  reachable: string[];
+}
+
+// ---- Цепь Миров (ТЗ v0.02 п. 4) ----
+
+export interface ChainKeyInfo {
+  id: string;
+  /** null — «в случайный мир» (среди уже подключённых к Цепи), выбирается при применении. */
+  targetSectorId: string | null;
+  source: string;
+  consumedAt: string | null;
+}
+export interface ChainResponse {
+  keys: ChainKeyInfo[];
+}
+export interface ChainConnectRequest {
+  keyId: string;
 }
 
 // ---- Journal ----

@@ -51,6 +51,10 @@ export const DEFAULT_GAME_CONFIG: GameConfig = {
     pickup: 10,
     attack: 100,
     special: 50,
+    upload_data: 50,
+    // Намеренно выше ovmBufferCap (ТЗ v0.02 п. 4): врата нельзя купить из
+    // буфера, только накопить в счётчике самого приказа за много сессий.
+    build_gate: 250_000,
   },
   conversion: { kCacheW: 1, kCacheR: 0.1, n: 1000 },
   ovmBufferCap: 100_000,
